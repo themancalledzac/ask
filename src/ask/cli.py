@@ -1,9 +1,11 @@
-"""Command line entry point. Only rbac is implemented so far."""
+"""Command line entry point. Question answering is not implemented yet."""
 
 import sys
+from pathlib import Path
 
-from ask.access import get_role, set_role
-from ask.model import ROLES, AskError
+from ask.access import can_see, get_role, set_role
+from ask.model import REFUSED, ROLES, AskError
+from ask.store import add_repo, connect, list_repos, remove_repo, set_repo_role
 
 COMMANDS = ("add-repo", "list-repos", "remove-repo", "update-repo", "rbac")
 USAGE = 'usage: ask "<question>" | ask rbac [employee|guest] | ask add-repo|list-repos|remove-repo|update-repo'
@@ -24,6 +26,59 @@ def _rbac(args: list[str]) -> int:
     return 0
 
 
+def _add_repo(args: list[str]) -> int:
+    """Index a folder: ask add-repo <path> [--name N]."""
+    name = None
+    if "--name" in args:
+        i = args.index("--name")
+        if i + 1 >= len(args):
+            raise AskError("--name needs a value. Run: ask add-repo <path> --name <name>")
+        name = args[i + 1]
+        args = args[:i] + args[i + 2 :]
+    if len(args) != 1:
+        raise AskError("add-repo takes one folder. Run: ask add-repo <path> [--name N]")
+    repo = add_repo(connect(), Path(args[0]), name)
+    print(f"added {repo.name} ({repo.file_count} files, role {repo.role})")
+    return 0
+
+
+def _list_repos(args: list[str]) -> int:
+    """Print the repos the caller may see, one per line."""
+    role = get_role()
+    repos = [r for r in list_repos(connect()) if can_see(role, r.role)]
+    if not repos:
+        print("No repos added. Run: ask add-repo <path>")
+    for r in repos:
+        print(f"{r.name}\t{r.role}\t{r.file_count} files\t{r.path}")
+    return 0
+
+
+def _remove_repo(args: list[str]) -> int:
+    """Delete a repo from the index: ask remove-repo <name>."""
+    if len(args) != 1:
+        raise AskError("remove-repo takes one name. Run: ask remove-repo <name>")
+    remove_repo(connect(), args[0])
+    print(f"removed {args[0]}")
+    return 0
+
+
+def _update_repo(args: list[str]) -> int:
+    """Change a repo's role: ask update-repo <name> <employee|guest>."""
+    if len(args) != 2:
+        raise AskError("update-repo takes a name and a role. Run: ask update-repo <name> <employee|guest>")
+    set_repo_role(connect(), args[0], args[1])
+    print(f"updated {args[0]} to role {args[1]}")
+    return 0
+
+
+REPO_COMMANDS = {
+    "add-repo": (_add_repo, True),
+    "list-repos": (_list_repos, False),
+    "remove-repo": (_remove_repo, True),
+    "update-repo": (_update_repo, True),
+}
+
+
 def _not_implemented(name: str) -> int:
     """Placeholder for commands added in later tasks."""
     print(f"{name}: not implemented yet", file=sys.stderr)
@@ -39,8 +94,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args[0] == "rbac":
             return _rbac(args[1:])
-        if args[0] in COMMANDS:
-            return _not_implemented(args[0])
+        if args[0] in REPO_COMMANDS:
+            handler, needs_employee = REPO_COMMANDS[args[0]]
+            if needs_employee and get_role() != "employee":
+                print(REFUSED)
+                return 2
+            return handler(args[1:])
         return _not_implemented("question")
     except AskError as e:
         print(str(e), file=sys.stderr)
