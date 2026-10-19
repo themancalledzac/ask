@@ -44,7 +44,7 @@ Test in step 2: the 12 questions in context-bundle/questions-last-week.md, plus 
 
 ## My answers, as rules
 
-All five were option A, and most are written into the risks above. Not found: a free-text hit has to contain every content word, with stopwords removed. If nothing does, retry once allowing one missing word. Anything looser is "Not found in added repos." There is no BM25 score cutoff.
+All five were option A, and most are written into the risks above. Not found: a free-text hit needs at least 60% of the content words (rounded up) in one chunk, or all of them with one or two words. Stopwords are removed first. A content word of 4 or more letters also matches as a prefix, so `prod` matches "production". Hits rank by how many words matched, then BM25. A line that contains the question word for word is not an answer and is skipped. Anything weaker is "Not found in added repos." There is no BM25 score cutoff.
 
 Decided for you, change any:
 - `--json` output is in step 1, with a stable schema and exit codes. The tests call `--json`.

@@ -20,7 +20,7 @@
 - A guest with no visible match gets exactly `Not found in added repos.`
 - A guest who names an employee repo with `--repo` gets exactly `Refused: needs employee access`, with no file names or hints.
 - Owners come only from services.json or CODEOWNERS, never doc text, a model, or git log. Git log committers may appear, labelled "recent committers, not owners".
-- Not found: a free-text hit has to contain every content word, with stopwords removed. If nothing does, retry once allowing one missing word. Anything looser is `Not found in added repos.` There is no BM25 score cutoff.
+- Not found: a free-text hit needs at least 60% of the content words (rounded up) in one chunk, or all of them with one or two words. Stopwords are removed first. A content word of 4 or more letters also matches as a prefix, so `prod` matches "production". Hits rank by how many words matched, then BM25. A line that contains the question word for word is not an answer and is skipped. Anything weaker is `Not found in added repos.` There is no BM25 score cutoff.
 - Secrets are redacted before text goes into the index: API keys, passwords in URLs, and signed tokens (JWTs). `.env*` files are skipped.
 - Every citation is `repo:path:line`. The quoted text equals the redacted text of that exact line, with whitespace trimmed.
 - A git repo indexes every `git ls-files` file, code and `.github/` included. A non-git folder indexes every text file, skipping `.git` and binaries.
@@ -228,7 +228,7 @@ broken-twin: skip `redact` in `add_repo` and confirm the last row goes red, then
 Search algorithm:
 1. Resolve visible repos. If `--repo` names a repo the caller can't see, return refused. If it names an unknown repo, return not found.
 2. Strict pass: an FTS MATCH where every word is a quoted phrase joined by AND. This is what keeps syntax characters safe.
-3. If there are no rows and there are 3 or more words, run one fallback pass: an OR of the AND-groups that each leave out one word. With 1 or 2 words there is no fallback.
+3. Replaced after step 1's real-data run (see the not-found rule in Global Constraints): candidates come from an FTS OR query with 4+ letter words as prefix terms, then each chunk is kept only if it covers the required share of content words, and lines that contain the question verbatim are skipped.
 4. Rank by `bm25(chunks)`. For each of the top `limit` chunks, the cited line is the line inside the chunk that holds the most content words. A line token counts as a content word when the two share their first 5 characters, or are equal when either is shorter than 5. Ties go to the first such line. The quote is that line, trimmed. Text output for an answered search is `Found in:` followed by the citations.
 5. No rows means not found.
 
@@ -236,7 +236,7 @@ GOAL: A question returns cited lines from visible repos, or the exact not-found 
 MUST HOLD:
 - A guest with no visible match gets exactly `Not found in added repos.`
 - A guest who names an employee repo with `--repo` gets exactly `Refused: needs employee access`, with no file names or hints.
-- Not found: a free-text hit has to contain every content word, with stopwords removed. If nothing does, retry once allowing one missing word. Anything looser is `Not found in added repos.` There is no BM25 score cutoff. The retry runs only with 3 or more content words.
+- Not found: a free-text hit needs at least 60% of the content words (rounded up) in one chunk, or all of them with one or two words. Stopwords are removed first. A content word of 4 or more letters also matches as a prefix, so `prod` matches "production". Hits rank by how many words matched, then BM25. A line that contains the question word for word is not an answer and is skipped. Anything weaker is `Not found in added repos.` There is no BM25 score cutoff.
 - Every citation is `repo:path:line`. The quoted text equals the redacted text of that exact line, with whitespace trimmed.
 - The caller's role comes only from `config.toml`. `answer()` takes it as a parameter, and only cli.py calls `get_role()`.
 - Repos are filtered by role before any chunk is read.
@@ -460,6 +460,6 @@ Not in the spec, added by this plan:
 - The caller defaults to `guest` when no role is set.
 - Admin commands need the employee role.
 - The porter tokenizer wraps unicode61.
-- The one-missing-word retry runs only with 3 or more content words. With 2 words it would accept a single-word match, which is the weak match the spec says is not found.
+- The match rule was loosened after step 1's run on the bundle questions, with the user's approval (see Global Constraints).
 
 The user should confirm these five. No dead code: the repo has no source files yet.
