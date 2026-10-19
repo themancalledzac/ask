@@ -89,6 +89,22 @@ Exit codes:
 | 2 | Refused |
 | 3 | Usage or input error |
 
+## Use it from an agent (MCP)
+
+`ask-mcp` runs an MCP server over stdio with one tool, `ask(question, repo?)`. It returns the same JSON as `ask --json`. To register it with Claude Code, run this from the clone:
+
+```
+claude mcp add ask -- uv run --directory <path-to-clone> --extra mcp ask-mcp
+```
+
+The role still comes from `ask rbac`. The server reads it on every call, and the tool has no role parameter. The server exposes no tool that changes roles or repos.
+
+To run the MCP tests too:
+
+```
+uv run --extra mcp pytest -q
+```
+
 ## Tests and eval
 
 ```

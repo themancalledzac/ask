@@ -28,3 +28,9 @@ Tools: Claude Code (Opus as controller, Sonnet for builders and reviewers, Haiku
 - Delegated: the README, the write-up draft and `ask --help` to one builder.
 - By hand: the fresh-clone test, reading the write-up line by line, and cutting one claim. The draft said the tool "works on a repo it has never seen", which no test proves now that the held-out repo is dropped.
 - Where things went wrong: PR #2 was stacked on the step 1 branch and merged into that branch, not main. I opened PR #3 to bring step 2 to main. A builder also left an empty `index.db` at the repo root during step 1. It was gitignored, so nothing shipped, but I deleted it.
+
+## Step 4 (MCP stretch, after the submission tag)
+
+- Delegated: the MCP server to one builder on Opus, then a reviewer.
+- By hand: a stdio check as guest and employee, including an injected `role` argument. Promoted two Minor findings to tests because they guard the access rule.
+- Where agents were wrong: the plan named `FastMCP`, but `mcp` 2.x renamed it `MCPServer`. The builder found that when it resolved the current SDK. One broken twin (`**kwargs`) went red for the wrong reason, because the SDK rejected every call. The builder reported it and used a `role` parameter twin instead.

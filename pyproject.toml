@@ -7,6 +7,12 @@ dependencies = []
 
 [project.scripts]
 ask = "ask.cli:main"
+ask-mcp = "ask.mcp_server:main"
+
+[project.optional-dependencies]
+mcp = [
+    "mcp>=2.3.0",
+]
 
 [dependency-groups]
 dev = ["pytest"]
