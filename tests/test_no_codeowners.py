@@ -216,3 +216,11 @@ def test_mcp_tool_returns_repo_info(plain):
     result = asyncio.run(server.call_tool("ask", {"question": "who owns this repo?", "repo": NAME}))
     assert result.structured_content["owners"] == []
     assert result.structured_content["repo_info"] == expected(WHOLE_REPO)
+
+
+def test_repo_flag_with_an_unmatched_path_token_is_plain_not_found(plain):
+    for question in ("who owns kubernetes.io?", "who owns lib/missing.py?"):
+        result = answer(plain, question, "employee", NAME)
+        assert result["status"] == "not_found"
+        assert result["message"] == NOT_FOUND
+        assert result["kind"] is None and result["repo_info"] == []

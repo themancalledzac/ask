@@ -156,10 +156,13 @@ def _asks_about_repo(rest: str, target: Repo) -> bool:
 
 
 def _targets(con: sqlite3.Connection, question: str, visible: list[Repo], target: Repo | None) -> dict[str, list[str]]:
-    """Visible repos the question targets by --repo, by name or by an indexed path, each with the paths it matched. --repo counts only when the question asks about the repo itself."""
+    """Visible repos the question targets by --repo, by name or by an indexed path, each with the paths it matched. --repo counts only when the question asks about the repo itself, and a path token that matches nothing in it counts as other text."""
     rest, tokens = _split_paths(question)
     words = {raw.lower().rstrip(TRAILING_PUNCTUATION) for raw in question.split()}
-    flagged = target is not None and _asks_about_repo(rest, target)
+    flagged = False
+    if target is not None:
+        matched = {label for label, _ in _match_paths(con, target, tokens)}
+        flagged = _asks_about_repo(" ".join([rest, *(t for t in tokens if t not in matched)]), target)
     budget = MAX_PATH_MATCHES
     out: dict[str, list[str]] = {}
     for repo in visible:
