@@ -56,6 +56,18 @@ def owned(ask_home, tmp_path):
     return con
 
 
+@pytest.fixture
+def mixed(owned, tmp_path):
+    root = tmp_path / "owned"
+    (root / "vendor" / "billing").mkdir(parents=True)
+    (root / "vendor" / "billing" / "notes.txt").write_text("vendored billing notes\n")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "vendor", author="Ana Lee")
+    add_repo(owned, root, "owned")
+    add_repo(owned, BUNDLE, "bundle")
+    return owned
+
+
 def owner_names(result):
     return [o["name"] for o in result["owners"]]
 
@@ -208,3 +220,54 @@ def test_load_services_finds_owner_lines():
 
 def test_recent_committers_outside_git_is_empty(tmp_path):
     assert recent_committers(tmp_path, None) == []
+
+
+def test_mixed_empty_owner_rule_is_not_found(mixed):
+    result = answer(mixed, "who owns vendor/billing/notes.txt?", "employee")
+    assert result["status"] == "not_found"
+    assert result["message"] == NOT_FOUND
+    assert "Sofia" not in json.dumps(result)
+
+
+def test_mixed_path_question_answers_from_codeowners_only(mixed):
+    result = answer(mixed, "who owns services/billing/api.py?", "employee")
+    assert owner_names(result) == ["@fixture-ana"]
+    text = json.dumps(result)
+    assert "Sofia" not in text and "Priya" not in text
+    check_quotes(mixed, result)
+
+
+def test_mixed_service_named_outside_path_still_answers(mixed):
+    result = answer(mixed, "who owns ledger and services/billing/api.py?", "employee")
+    assert owner_names(result) == ["Sofia Reyes", "@fixture-ana"]
+    check_quotes(mixed, result)
+
+
+def test_file_name_without_directory_is_not_found(owned):
+    result = answer(owned, "who owns README.md?", "employee")
+    assert result["status"] == "not_found"
+    assert result["message"] == NOT_FOUND
+
+
+def test_recent_committers_needs_git_root(tmp_path):
+    root = tmp_path / "outer"
+    inner = root / "inner"
+    inner.mkdir(parents=True)
+    (inner / "a.txt").write_text("a\n")
+    git(root, "init", "-q")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "one", author="Ana Lee")
+    assert recent_committers(root, "inner/a.txt") == [{"name": "Ana Lee", "commits": 1}]
+    assert recent_committers(inner, "a.txt") == []
+
+
+def test_owner_line_that_does_not_quote_the_owner_is_skipped(ask_home, tmp_path):
+    root = tmp_path / "odd"
+    root.mkdir()
+    (root / "services.json").write_text(
+        '{"services": [\n  {"owner": "Al First",\n   "name": "alpha"},\n  {"name": "beta",\n   "owner": "Bo Two"}\n]}\n'
+    )
+    con = connect()
+    add_repo(con, root, "odd")
+    assert answer(con, "who owns alpha?", "employee")["status"] == "not_found"
+    assert owner_names(answer(con, "who owns beta?", "employee")) == ["Bo Two"]

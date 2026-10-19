@@ -69,16 +69,20 @@ def _owner(name: str, team: str | None, repo: Repo, rel: str, line: int) -> dict
     return {"name": name, "team": team, "citation": asdict(Citation(repo.name, rel, line, quote))}
 
 
-def _path_tokens(question: str) -> list[str]:
-    out = []
+def _split_paths(question: str) -> tuple[str, list[str]]:
+    """Split the question into its words outside path tokens and the path tokens themselves."""
+    rest, paths = [], []
     for raw in question.split():
         token = raw.rstrip(TRAILING_PUNCTUATION)
         if token.startswith("./"):
             token = token[2:]
         token = token.lstrip("/")
-        if token and ("/" in token or "." in token) and token not in out:
-            out.append(token)
-    return out
+        if token and ("/" in token or "." in token):
+            if token not in paths:
+                paths.append(token)
+        else:
+            rest.append(raw)
+    return " ".join(rest), paths
 
 
 def _match_paths(con: sqlite3.Connection, repo: Repo, tokens: list[str]) -> list[tuple[str, str]]:
@@ -92,8 +96,6 @@ def _match_paths(con: sqlite3.Connection, repo: Repo, tokens: list[str]) -> list
             out.append((token, token))
         elif any(p.startswith(prefix) for p in paths):
             out.append((token, prefix))
-        else:
-            out.extend((p, p) for p in paths if p.endswith("/" + token))
     return out
 
 
@@ -105,15 +107,14 @@ def _service_owners(question: str, visible: list[Repo]) -> tuple[list[str], list
         if not s.owner or not s.owner_line:
             continue
         entry = _owner(s.owner, s.team, home[id(s)], "services.json", s.owner_line)
-        if entry is not None:
+        if entry is not None and s.owner in entry["citation"]["quote"]:
             owners.append(entry)
             if s.name not in labels:
                 labels.append(s.name)
     return labels, owners
 
 
-def _path_owners(con: sqlite3.Connection, question: str, visible: list[Repo]) -> tuple[list[str], list[dict], Counter]:
-    tokens = _path_tokens(question)
+def _path_owners(con: sqlite3.Connection, tokens: list[str], visible: list[Repo]) -> tuple[list[str], list[dict], Counter]:
     labels, owners, committers, seen = [], [], Counter(), 0
     if not tokens:
         return labels, owners, committers
@@ -129,7 +130,7 @@ def _path_owners(con: sqlite3.Connection, question: str, visible: list[Repo]) ->
         rel = codeowners.relative_to(root).as_posix()
         for label, path in _match_paths(con, repo, tokens):
             if seen == MAX_PATH_MATCHES:
-                break
+                return labels, owners, committers
             seen += 1
             rule = owners_for_path(rules, path)
             if rule is None or not rule.owners:
@@ -146,9 +147,10 @@ def _path_owners(con: sqlite3.Connection, question: str, visible: list[Repo]) ->
 
 
 def _owners(con: sqlite3.Connection, question: str, visible: list[Repo]) -> dict:
-    """Owners from services.json and CODEOWNERS in visible repos only. Never falls back to text search."""
-    service_labels, service_owners = _service_owners(question, visible)
-    path_labels, path_owners, committers = _path_owners(con, question, visible)
+    """Owners from services.json and CODEOWNERS in visible repos only. Path tokens are matched against CODEOWNERS and never against service names. Never falls back to text search."""
+    rest, tokens = _split_paths(question)
+    service_labels, service_owners = _service_owners(rest, visible)
+    path_labels, path_owners, committers = _path_owners(con, tokens, visible)
     owners = service_owners + path_owners
     if not owners:
         return _result("not_found", None, NOT_FOUND)

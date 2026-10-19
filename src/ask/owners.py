@@ -155,10 +155,10 @@ def load_services(root: Path) -> list[Service]:
         pattern = _name_line(entry["name"])
         start = next((i for i in range(cursor, len(lines)) if pattern.search(lines[i])), None)
         if start is not None:
+            cursor = start + 1
             hit = next((i for i in range(start + 1, len(lines)) if _OWNER_KEY.search(lines[i])), None)
             if hit is not None:
                 owner_line = hit + 1
-                cursor = hit + 1
         out.append(
             Service(
                 entry["name"],
@@ -199,14 +199,14 @@ def resolve_service(question: str, services: list[Service]) -> list[Service]:
 
 
 def recent_committers(root: Path, path: str | None, n: int = 3) -> list[dict]:
-    """Top committers by count over the last 200 commits touching the path, from git log. These are never owners. Outside a git work tree, or on any git failure, the list is empty."""
+    """Top committers by count over the last 200 commits touching the path, from git log. These are never owners. Unless the root is a git root, or on any git failure, the list is empty."""
     try:
-        inside = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+        top = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
         )
-        if inside.returncode != 0 or inside.stdout.strip() != "true":
+        if top.returncode != 0 or Path(top.stdout.strip()).resolve() != Path(root).resolve():
             return []
         cmd = ["git", "-C", str(root), "log", "-n", "200", "--format=%an"]
         if path:
