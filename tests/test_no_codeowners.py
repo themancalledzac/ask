@@ -86,6 +86,18 @@ def test_owner_question_with_no_target_is_plain_not_found(plain):
     assert result["kind"] is None and result["repo_info"] == []
 
 
+def test_repo_flag_with_an_unrelated_subject_is_plain_not_found(plain):
+    result = answer(plain, "who owns kubernetes?", "employee", NAME)
+    assert result["status"] == "not_found"
+    assert result["message"] == NOT_FOUND
+    assert result["kind"] is None and result["repo_info"] == []
+
+
+def test_repo_flag_with_the_repo_name_or_a_repo_word_targets_it(plain):
+    for question in ("who owns plain app?", "who owns the codebase?", "who owns plain.app?"):
+        assert answer(plain, question, "employee", NAME)["message"] == MESSAGE
+
+
 def test_cli_text_labels_org_and_committers_as_not_owners(plain, capsys):
     assert main(["rbac", "employee"]) == 0
     capsys.readouterr()
@@ -94,6 +106,20 @@ def test_cli_text_labels_org_and_committers_as_not_owners(plain, capsys):
         MESSAGE,
         "GitHub org (not an owner): acme on github.com",
         "Recent committers, not owners: Ben Ko (2), Ana Lee (1)",
+    ]
+
+
+def test_cli_prefixes_lines_with_repo_when_several_repos(plain, tmp_path, capsys):
+    add_repo(plain, make_repo(tmp_path / "other", "git@gitlab.com:beta/other.app.git"), "other.app")
+    assert main(["rbac", "employee"]) == 0
+    capsys.readouterr()
+    assert main(["who", "owns", "plain.app", "and", "other.app?"]) == 1
+    assert capsys.readouterr().out.splitlines() == [
+        "No CODEOWNERS file in other.app, so no owner is recorded. " + MESSAGE,
+        "other.app: GitHub org (not an owner): beta on gitlab.com",
+        "other.app: Recent committers, not owners: Ben Ko (2), Ana Lee (1)",
+        f"{NAME}: GitHub org (not an owner): acme on github.com",
+        f"{NAME}: Recent committers, not owners: Ben Ko (2), Ana Lee (1)",
     ]
 
 
@@ -106,6 +132,7 @@ def test_cli_text_labels_org_and_committers_as_not_owners(plain, capsys):
         ("ssh://git@git.example.com:2222/acme/widget", {"host": "git.example.com", "org": "acme", "name": "widget"}),
         ("https://github.com/acme/edens.zac.git", {"host": "github.com", "org": "acme", "name": "edens.zac"}),
         ("https://user:secretvalue@github.com/acme/widget.git", {"host": "github.com", "org": "acme", "name": "widget"}),
+        (f"https://{TOKEN}@github.com/acme/widget.git", {"host": "github.com", "org": "acme", "name": "widget"}),
         ("/srv/git/widget.git", None),
         ("https://github.com/widget", None),
     ],

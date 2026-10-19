@@ -23,6 +23,7 @@ from ask.search import content_words, fts_search
 from ask.store import Repo, list_repos
 
 MAX_PATH_MATCHES = 5
+REPO_WORDS = frozenset({"repo", "repository", "project", "codebase"})
 TRAILING_PUNCTUATION = "?.,:;!"
 
 
@@ -148,20 +149,30 @@ def _path_owners(con: sqlite3.Connection, tokens: list[str], visible: list[Repo]
     return labels, owners, committers
 
 
-def _targets(con: sqlite3.Connection, question: str, tokens: list[str], visible: list[Repo], target: Repo | None) -> dict[str, list[str]]:
-    """Visible repos the question targets by --repo, by name or by an indexed path, each with the paths it matched."""
+def _asks_about_repo(rest: str, target: Repo) -> bool:
+    """True when the non-path text names nothing beyond owner words, repo words and the repo's own name."""
+    extra = set(content_words(rest)) - OWNER_WORDS - REPO_WORDS - set(content_words(target.name))
+    return not extra
+
+
+def _targets(con: sqlite3.Connection, question: str, visible: list[Repo], target: Repo | None) -> dict[str, list[str]]:
+    """Visible repos the question targets by --repo, by name or by an indexed path, each with the paths it matched. --repo counts only when the question asks about the repo itself."""
+    rest, tokens = _split_paths(question)
     words = {raw.lower().rstrip(TRAILING_PUNCTUATION) for raw in question.split()}
+    flagged = target is not None and _asks_about_repo(rest, target)
+    budget = MAX_PATH_MATCHES
     out: dict[str, list[str]] = {}
     for repo in visible:
-        paths = [path for _, path in _match_paths(con, repo, tokens)]
-        if paths or (target is not None and repo.name == target.name) or repo.name.lower() in words:
+        paths = [path for _, path in _match_paths(con, repo, tokens)][:budget]
+        budget -= len(paths)
+        if paths or (flagged and repo.name == target.name) or repo.name.lower() in words:
             out[repo.name] = paths
     return out
 
 
-def _no_codeowners(con: sqlite3.Connection, question: str, tokens: list[str], visible: list[Repo], target: Repo | None) -> dict | None:
+def _no_codeowners(con: sqlite3.Connection, question: str, visible: list[Repo], target: Repo | None) -> dict | None:
     """The answer for targeted repos that have no CODEOWNERS file, or None when there are none. The org and committers are context, never owners."""
-    targets = _targets(con, question, tokens, visible, target)
+    targets = _targets(con, question, visible, target)
     bare = [r for r in visible if r.name in targets and find_codeowners(Path(r.path)) is None]
     if not bare:
         return None
@@ -185,7 +196,7 @@ def _owners(con: sqlite3.Connection, question: str, visible: list[Repo], target:
     path_labels, path_owners, committers = _path_owners(con, tokens, visible)
     owners = service_owners + path_owners
     if not owners:
-        return _no_codeowners(con, question, tokens, visible, target) or _result("not_found", None, NOT_FOUND)
+        return _no_codeowners(con, question, visible, target) or _result("not_found", None, NOT_FOUND)
     result = _result("answered", "owner", f"Owner of {', '.join(service_labels + path_labels)}:")
     result["owners"] = owners
     result["recent_committers"] = [{"name": n, "commits": c} for n, c in committers.most_common(3)]

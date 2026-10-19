@@ -80,7 +80,7 @@ To let guests see the bundle, an employee runs `ask update-repo context-bundle g
 | `ask update-repo <name> <employee\|guest>` | Change which role can see a repo. Employee only. |
 | `ask --help` | Print usage. |
 
-An owner question about a repo with no CODEOWNERS file, named by `--repo`, by its name or by a path in it, says `No CODEOWNERS file in <repo>, so no owner is recorded.` and exits 1. It also prints the GitHub org parsed from the `origin` remote and the top recent committers, both labelled as not owners. In `--json` they are under `repo_info`, and `owners` stays empty. Only the host, org and repo name of the remote are shown, never the URL or any user or token in it.
+An owner question about a repo with no CODEOWNERS file says `No CODEOWNERS file in <repo>, so no owner is recorded.` and exits 1. The question targets a repo by its name, by a path in it, or with `--repo` when it asks about the repo itself (`who owns this repo?`). It also prints the GitHub org parsed from the `origin` remote and the top recent committers, both labelled as not owners. In `--json` they are under `repo_info`, and `owners` stays empty. Only the host, org and repo name of the remote are shown, never the URL or any user or token in it.
 
 Exit codes:
 
