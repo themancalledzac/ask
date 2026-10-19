@@ -16,4 +16,5 @@ Minutes are counted from the moment the clock started. "before clock" means befo
 | Task 6: eval runner and step 1 scores | T+14 | T+36 | 22 | held-out dropped; seen 10/13 (3 owner rows wait for step 2); step 1 PR opened |
 | Task 4b: coverage match rule, echo-line skip | T+32 | T+32 | 0 | 8276d13..cfb30d5: 60% coverage + prefix match, echo-line skip; bundle questions 4/12 -> 8/12 search answers; 1 fix round; 178 tests |
 | Task 7: owner answers | T+36 | T+44 | 8 | 60fe94e..b03d7cf, 1 fix round (path words fed service match; suffix match removed); 197 tests; seen 13/13 |
-| Task 8: bundle rows and step 2 scores | T+44 |  |  | 16 rows added (12 bundle questions + 4 owner not-found); seen 29/29 after ruling Q9 accepts oncall.md (weak answer); waiting on user row check, then step 2 PR |
+| Task 8: bundle rows and step 2 scores | T+44 | T+49 | 5 | PR #1 merged to main; PR #2 merged into step-1 branch (stacked base), so step 2 not on main yet; replacement PR step-2-owners -> main opened |
+| Task 9: ship | T+49 |  |  |  |
