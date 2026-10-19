@@ -4,7 +4,7 @@
 
 `ask` is a Python CLI that answers "where does X live / who owns X" from repos you add. Every answer cites `repo:path:line`, and a test checks that the quoted text is on that line. It indexes every git-tracked file (code included) into SQLite FTS5 and uses only the standard library. Two roles, employee and guest, decide which repos a question can see.
 
-I scoped it to three things that had to be true. First, it works on a repo it has never seen, because the interview pairs on their repo. So the bundle is added with `ask add-repo` like any other folder. Second, owner answers come only from `services.json` or CODEOWNERS (GitHub's rules, last match wins), never from doc text. Recent git committers can be shown, labelled as not owners. Third, a weak match says "Not found in added repos." instead of guessing.
+I scoped it to three things that had to be true. First, it should work on a repo it has never seen, because the interview pairs on their repo. So the bundle is added with `ask add-repo` like any other folder, and the CODEOWNERS rules are tested on a fixture built from GitHub's docs. I did not score a held-out repo, so this is designed for, not proven. Second, owner answers come only from `services.json` or CODEOWNERS (GitHub's rules, last match wins), never from doc text. Recent git committers can be shown, labelled as not owners. Third, a weak match says "Not found in added repos." instead of guessing.
 
 The eval scores 29/29 on the seen rows, which include all 12 bundle questions (notes/SCOREBOARD.md). 200 tests pass.
 
