@@ -128,3 +128,36 @@ def test_find_none_and_directory_ignored(tmp_path):
     assert find_codeowners(tmp_path) is None
     (tmp_path / "CODEOWNERS").mkdir()
     assert find_codeowners(tmp_path) is None
+
+
+def test_root_star_matches_top_level_files_only():
+    assert owners("/* @a\n", "a.py") == ["@a"]
+    assert owners("/* @a\n", "src/a.py") is None
+
+
+def test_bare_star_matches_everything():
+    assert owners("* @a\n", "a.py") == ["@a"]
+    assert owners("* @a\n", "src/x/a.py") == ["@a"]
+
+
+def test_leading_double_star_dir():
+    text = "**/logs @a\n"
+    assert owners(text, "logs") == ["@a"]
+    assert owners(text, "a/b/logs/x") == ["@a"]
+
+
+def test_double_star_then_extension():
+    text = "docs/**/*.md @a\n"
+    assert owners(text, "docs/a.md") == ["@a"]
+    assert owners(text, "docs/x/y/a.md") == ["@a"]
+    assert owners(text, "docs/a.txt") is None
+
+
+def test_trailing_slash_does_not_match_file_of_same_name():
+    text = "apps/ @a\n"
+    assert owners(text, "apps") is None
+    assert owners(text, "apps/x") == ["@a"]
+
+
+def test_lone_slash_pattern_skipped():
+    assert parse_codeowners("/ @a\n") == []

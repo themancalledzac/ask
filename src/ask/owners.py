@@ -44,8 +44,8 @@ def _compile(pattern: str) -> re.Pattern:
     dir_only = pattern.endswith("/")
     body = pattern.rstrip("/") if dir_only else pattern
     anchored = body.startswith("/") or "/" in body
+    one_level = not dir_only and (body == "/*" or body.endswith("/*"))
     body = body.lstrip("/")
-    one_level = not dir_only and body.endswith("/*")
 
     parts = []
     i = 0
@@ -89,7 +89,7 @@ def parse_codeowners(text: str) -> list[Rule]:
         if not tokens:
             continue
         pattern = tokens[0]
-        if pattern.startswith("!") or "[" in pattern or "]" in pattern:
+        if pattern.startswith("!") or "[" in pattern or "]" in pattern or not pattern.strip("/"):
             continue
         rules.append(Rule(pattern, tokens[1:], number, _compile(pattern)))
     return rules
@@ -98,7 +98,6 @@ def parse_codeowners(text: str) -> list[Rule]:
 def owners_for_path(rules: list[Rule], path: str) -> Rule | None:
     """Return the last rule matching a repo-relative POSIX path, or None. The winner may have no owners."""
     for rule in reversed(rules):
-        regex = rule.regex or _compile(rule.pattern)
-        if regex.match(path):
+        if rule.regex.match(path):
             return rule
     return None
