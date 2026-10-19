@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import check_quotes
 from ask.answer import answer
 from ask.cli import main
 from ask.model import NOT_FOUND, REFUSED
@@ -51,12 +52,6 @@ def make(tmp_path, name, files, role="employee", con=None):
     set_repo_role(con, name, role)
     return con
 
-
-def check_quotes(con, result):
-    paths = {r.name: Path(r.path) for r in list_repos(con)}
-    for h in result["hits"]:
-        lines = redact_lines(read_text_lines(paths[h["repo"]] / h["path"]))
-        assert lines[h["line"] - 1].strip() == h["quote"]
 
 
 @pytest.fixture

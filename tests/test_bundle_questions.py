@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from test_answer import check_quotes
+from conftest import check_quotes
 
 from ask.answer import answer
 from ask.model import NOT_FOUND

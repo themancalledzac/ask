@@ -17,7 +17,7 @@ PREFIX_MIN = 4
 STEM = 5
 RATIO = 0.6
 CANDIDATES = 200
-ECHO_MIN_WORDS = 3
+ECHO_MIN_RAW_WORDS = 3
 
 
 def _tokens(text: str) -> list[str]:
@@ -80,7 +80,7 @@ def fts_search(
     limit: int = 3,
     question: str | None = None,
 ) -> list[Citation]:
-    """Return up to limit citations from the named repos. A chunk needs 60% of the words (all, up to two), ranked by words covered then BM25. A chunk that quotes a question of 3 or more words is a chat log and is dropped."""
+    """Return up to limit citations from the named repos. A chunk needs 60% of the words (all, up to two), ranked by words covered then BM25. A chunk with a line quoting the question is dropped when the question has 3 or more raw words, stopwords included."""
     if not words or not repos:
         return []
     marks = ", ".join("?" for _ in repos)
@@ -92,7 +92,7 @@ def fts_search(
     rows = con.execute(sql, (match, *repos)).fetchall()
     need = _need(len(words))
     echo = _normalize(question).rstrip("?!. \t\n") if question else ""
-    if len(echo.split()) < ECHO_MIN_WORDS:
+    if len(echo.split()) < ECHO_MIN_RAW_WORDS:
         echo = ""
     kept = []
     for rank, (text, repo, path, start) in enumerate(rows):

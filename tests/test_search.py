@@ -84,6 +84,23 @@ def test_chunk_quoting_the_question_is_dropped(ask_home, tmp_path):
     assert len(fts_search(con, ["cache"], ["r"])) == 2
 
 
+def test_echo_threshold_counts_raw_words_not_content_words(ask_home, tmp_path):
+    files = {
+        "log.md": '1. "what\'s the repo for courier?" asked by devon\n',
+        "doc.md": "the courier repo lives at github.com/org/courier\n",
+    }
+    con = build(tmp_path, files)
+    question = "what's the repo for courier?"
+    assert len(content_words(question)) < 3
+    hits = fts_search(con, content_words(question), ["r"], question=question)
+    assert [h.path for h in hits] == ["doc.md"]
+
+
+def test_four_words_with_two_covered_is_not_found(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "alpha beta\n"})
+    assert fts_search(con, ["alpha", "beta", "zzzz", "yyyy", "xxxx"], ["r"]) == []
+
+
 def test_short_question_is_not_treated_as_an_echo(ask_home, tmp_path):
     con = build(tmp_path, {"a.md": "the cache lives in redis\n"})
     assert len(fts_search(con, ["cache"], ["r"], question="cache?")) == 1
