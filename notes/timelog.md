@@ -18,5 +18,5 @@ Minutes are counted from the moment the clock started. "before clock" means befo
 | Task 7: owner answers | T+36 | T+44 | 8 | 60fe94e..b03d7cf, 1 fix round (path words fed service match; suffix match removed); 197 tests; seen 13/13 |
 | Task 8: bundle rows and step 2 scores | T+44 | T+49 | 5 | PR #1 merged to main; PR #2 merged into step-1 branch (stacked base), so step 2 not on main yet; replacement PR step-2-owners -> main opened |
 | Task 9: ship | T+49 | T+53 | 4 | PR #4 merged; tag submission on 0c77451; 200 tests, eval 29/29; repo stays private until just before the interview, so the uvx line is untested |
-| Task 10: MCP server | T+56 | T+56 | 0 | 1c0f591: one ask tool via mcp 2.3 MCPServer; 204 tests with extra; in review |
+| Task 10: MCP server | T+56 | T+62 | 6 | 1c0f591..d62e9ac: MCP server, one ask tool; injected role ignored (tested); 208 tests with extra; step 4 PR opened |
 | Ship by the buzzer | T+56 |  |  | submission tagged at 0c77451 (T+53); repo private until just before the interview |
