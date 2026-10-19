@@ -2,11 +2,11 @@
 
 ## What I built and why
 
-`ask` is a Python CLI that answers "where does X live / who owns X" from repos you add. Every answer cites `repo:path:line`, and a test checks that the quoted text is on that line. It indexes every git-tracked file (code included) into SQLite FTS5 and uses only the standard library. Two roles, employee and guest, decide which repos a question can see.
+`ask` is a Python CLI that answers "where does X live / who owns X" from repos you add. Every answer cites `repo:path:line`, and a test checks that the quoted text is on that line. It indexes every git-tracked file (code included) into SQLite FTS5 and uses only the standard library, except the optional `mcp` extra for the MCP server. Two roles, employee and guest, decide which repos a question can see.
 
 I scoped it to three things that had to be true. First, it should work on a repo it has never seen, because the interview pairs on their repo. So the bundle is added with `ask add-repo` like any other folder, and the CODEOWNERS rules are tested on a fixture built from GitHub's docs. I did not score a held-out repo, so this is designed for, not proven. Second, owner answers come only from `services.json` or CODEOWNERS (GitHub's rules, last match wins), never from doc text. Recent git committers can be shown, labelled as not owners. Third, a weak match says "Not found in added repos." instead of guessing.
 
-The eval scores 29/29 on the seen rows, which include all 12 bundle questions (notes/SCOREBOARD.md). 200 tests pass.
+The eval scores 29/29 on the seen rows, which include all 12 bundle questions (notes/SCOREBOARD.md). `uv run --extra mcp pytest -q` passes.
 
 Left out on purpose: live `gh api` owner lookups, Slack and Notion connectors, a web UI, real SSO, a model writing answers, and a stale-docs report.
 
@@ -30,7 +30,7 @@ Left out on purpose: live `gh api` owner lookups, Slack and Notion connectors, a
 
 ## Safety and exposure
 
-The role is self-asserted today: anyone can run `ask rbac employee`. It stands in for SSO login, where the role would come from identity-provider groups. Secrets (API keys, passwords in URLs, JWTs, private keys) are redacted at index time and `.env*` files are skipped, but a real rollout needs secret scanning at the source. Internal and external repos map to the employee and guest roles. Anything an agent can run can change the role, so the MCP tool exposes only `ask`, not `rbac` or the repo commands, and a test (`tests/test_mcp.py`) proves its schema has no role field.
+The role is self-asserted today: anyone can run `ask rbac employee`. It stands in for SSO login, where the role would come from identity-provider groups. Some secret shapes are redacted at index time: AWS key ids, GitHub, Slack, OpenAI and Stripe key prefixes, values assigned to secret-named keys (`password`, `token`, `api_key`, `*_KEY`, including quoted JSON keys), bearer tokens, passwords in URLs, JWTs and private key blocks. `.env*` files are skipped. Anything else is indexed as written, so a real rollout needs secret scanning at the source. Internal and external repos map to the employee and guest roles. Anything an agent can run can change the role, so the MCP tool exposes only `ask`, not `rbac` or the repo commands, and a test (`tests/test_mcp.py`) proves its schema has no role field.
 
 ## How I used AI tooling
 

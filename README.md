@@ -9,7 +9,7 @@ The write-up for the take-home is in [notes/WRITEUP.md](notes/WRITEUP.md).
 - [uv](https://docs.astral.sh/uv/)
 - git
 
-There are no other dependencies. `ask` uses only the Python standard library.
+`ask` uses only the Python standard library. The MCP server needs the optional `mcp` extra (see below).
 
 ## Run it
 

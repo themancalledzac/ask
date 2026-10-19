@@ -1,4 +1,4 @@
-"""Locates the ask home directory, which holds config.toml and later the index."""
+"""Locates the ask home directory, which holds config.toml and index.db."""
 
 import os
 from pathlib import Path
