@@ -2,7 +2,7 @@
 
 ## What I built and why
 
-`ask` is a Python CLI that answers "where does X live / who owns X" from repos you add, with a `repo:path:line` citation on every answer. It indexes every git-tracked file (code included) into SQLite FTS5, and only the standard library is used. Two roles, employee and guest, decide which repos a question can see.
+`ask` is a Python CLI that answers "where does X live / who owns X" from repos you add, with a `repo:path:line` citation on every answer. It indexes every git-tracked file (code included) into SQLite FTS5, and only the standard library is used. Two roles, employee and guest, decide which repos a question can see. Owner questions ("who owns X", "who should review X") are answered only from `services.json` or CODEOWNERS (GitHub's rules, last match wins). They never come from doc text. Recent git committers can be shown, labelled as not owners.
 
 Left out on purpose: Slack and Notion connectors, a web UI, real login, a model writing answers, live GitHub lookups, and a stale-docs report.
 

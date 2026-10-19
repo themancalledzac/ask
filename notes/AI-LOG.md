@@ -16,3 +16,9 @@ Tools: Claude Code (Opus as controller, Sonnet for builders and reviewers, Haiku
   - Task 4's quote check only ever saw hits on a chunk's first line, so it couldn't catch a wrong line number. The reviewer caught it, and one fix round added mid-chunk fixtures.
   - Task 5's `/*` matched nested files because the leading slash was stripped before the one-level check. The reviewer caught it, and one fix round fixed it.
   - Running the 12 bundle questions by hand found two things no agent had caught. First, the questions log quoted every question, so it "answered" all of them. Second, the strict all-words rule answered only 4 of 12. I prototyped a 60% coverage rule with prefix matching, the user approved it, and a builder applied it test-first (Task 4b). The builder changed the echo skip to drop the whole block. Its reviewer then caught that the skip counted raw words while my ruling said content words. I restated the ruling to match the code, which the courier question needs.
+
+## Step 2
+
+- Delegated: Task 7 (owner routing) to a builder on Opus, then a reviewer. A separate golden agent wrote the 12 bundle question rows and 4 owner not-found rows.
+- By hand: ran the owner questions end to end as employee and as guest. Ruled that the suffix path match was out of scope, and ruled that the "where do secrets go" row accepts oncall.md instead of loosening the rule to fit one row.
+- Where agents got it wrong: Task 7 let words inside a path ("billing" in `services/billing/api.py`) match a service. So a path that CODEOWNERS marks as unowned was answered with the ledger owner. The builder flagged it as a concern, and the reviewer reproduced it. One fix round took path tokens out of the service match, with tests that add the bundle and a CODEOWNERS repo together.

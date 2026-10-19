@@ -114,6 +114,13 @@ def _ask(args: list[str]) -> int:
         print(result["message"])
         for h in result["hits"]:
             print(f"{h['repo']}:{h['path']}:{h['line']}  {h['quote']}")
+        for o in result["owners"]:
+            c = o["citation"]
+            who = o["name"] if o["team"] is None else f"{o['name']} ({o['team']})"
+            print(f"{who}  {c['repo']}:{c['path']}:{c['line']}  {c['quote']}")
+        if result["recent_committers"]:
+            names = ", ".join(f"{c['name']} ({c['commits']})" for c in result["recent_committers"])
+            print(f"Recent committers, not owners: {names}")
     return EXIT_CODES[result["status"]]
 
 

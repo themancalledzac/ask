@@ -11,3 +11,19 @@
 {"q": "who owns services/billing/api.py?", "role": "employee", "repo": "codeowners-fixture", "status": "answered", "owners_include": ["@fixture-ana"], "must_not_contain": ["@fixture/billing"], "path_endswith": null}
 {"q": "who owns services/web/page.html?", "role": "employee", "repo": "codeowners-fixture", "status": "answered", "owners_include": ["@fixture/platform"], "must_not_contain": ["@fixture/web"], "path_endswith": null}
 {"q": "who owns services/billing/README.md?", "role": "employee", "repo": "codeowners-fixture", "status": "answered", "owners_include": ["@fixture/billing", "@fixture-ben"], "must_not_contain": ["@fixture/docs"], "path_endswith": null}
+{"q": "who owns ledger? billing export looks off", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": null, "owners_include": ["Sofia Reyes"], "must_not_contain": ["Priya Nadkarni", "Marcus Webb"]}
+{"q": "how do I deploy to prod? do I need approval?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "docs/deploy-pipeline.md", "owners_include": [], "must_not_contain": []}
+{"q": "where's the runbook for beacon backlog?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "docs/oncall.md", "owners_include": [], "must_not_contain": []}
+{"q": "is the growth dashboard or the spreadsheet the source of truth?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "docs/data-warehouse.md", "owners_include": [], "must_not_contain": []}
+{"q": "what's the repo for courier?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "services.json", "owners_include": [], "must_not_contain": []}
+{"q": "who do I ask to get added to PagerDuty?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "docs/onboarding.md", "owners_include": [], "must_not_contain": []}
+{"q": "atlas-api is 5xx-ing, who's on call?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "docs/oncall.md", "owners_include": [], "must_not_contain": []}
+{"q": "who owns billing now? I thought it was someone who left", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": null, "owners_include": ["Sofia Reyes"], "must_not_contain": ["Priya Nadkarni", "Marcus Webb"]}
+{"q": "where do secrets go? can I just put the key in the repo for now?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "docs/oncall.md", "owners_include": [], "must_not_contain": []}
+{"q": "what does lookout actually pull from?", "role": "guest", "repo": "context-bundle", "status": "not_found", "path_endswith": null, "owners_include": [], "must_not_contain": []}
+{"q": "how do I run atlas-api locally? make dev fails", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": "docs/onboarding.md", "owners_include": [], "must_not_contain": []}
+{"q": "who should review my PR for forge?", "role": "guest", "repo": "context-bundle", "status": "answered", "path_endswith": null, "owners_include": ["Priya Nadkarni"], "must_not_contain": ["Marcus Webb", "Sofia Reyes"]}
+{"q": "who owns the data warehouse?", "role": "guest", "repo": "context-bundle", "status": "not_found", "path_endswith": null, "owners_include": [], "must_not_contain": []}
+{"q": "who owns payroll?", "role": "guest", "repo": "context-bundle", "status": "not_found", "path_endswith": null, "owners_include": [], "must_not_contain": []}
+{"q": "what is the expense reimbursement policy?", "role": "guest", "repo": "context-bundle", "status": "not_found", "path_endswith": null, "owners_include": [], "must_not_contain": []}
+{"q": "who is the owner of the vpn?", "role": "guest", "repo": "context-bundle", "status": "not_found", "path_endswith": null, "owners_include": [], "must_not_contain": []}
