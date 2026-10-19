@@ -61,7 +61,7 @@ def check_quotes(con, result):
 
 @pytest.fixture
 def two_repos(ask_home, tmp_path):
-    con = make(tmp_path, "vault", {"notes.md": "the zorbquill service lives here\n"})
+    con = make(tmp_path, "vault", {"notes.md": "intro\nnothing here\nthe zorbquill service lives here\n"})
     make(tmp_path, "pub", {"readme.md": "public readme\nnothing special\n"}, "guest", con)
     return con
 
@@ -97,14 +97,14 @@ def test_employee_gets_hit_with_matching_quote(two_repos, capsys):
     result = answer(two_repos, "zorbquill", "employee")
     assert result["status"] == "answered"
     assert result["kind"] == "search"
-    assert [(h["repo"], h["path"], h["line"]) for h in result["hits"]] == [("vault", "notes.md", 1)]
+    assert [(h["repo"], h["path"], h["line"]) for h in result["hits"]] == [("vault", "notes.md", 3)]
     check_quotes(two_repos, result)
     assert main(["rbac", "employee"]) == 0
     capsys.readouterr()
     assert main(["zorbquill"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "Found in:"
-    assert lines[1] == "  vault:notes.md:1  the zorbquill service lives here"
+    assert lines[1] == "vault:notes.md:3  the zorbquill service lives here"
 
 
 def test_unknown_repo_is_not_found_even_for_guest(two_repos, tmp_path):
@@ -112,19 +112,28 @@ def test_unknown_repo_is_not_found_even_for_guest(two_repos, tmp_path):
     assert answer(two_repos, "zorbquill", "employee", repo=str(tmp_path / "elsewhere"))["status"] == "not_found"
 
 
+def test_hit_below_chunk_start_is_cited_at_its_own_line(ask_home, tmp_path):
+    con = make(tmp_path, "r", {"a.md": "intro\nnothing here\nthe zorbquill service lives here\n"})
+    result = answer(con, "zorbquill", "employee")
+    assert [(h["line"], h["quote"]) for h in result["hits"]] == [(3, "the zorbquill service lives here")]
+    check_quotes(con, result)
+
+
 def test_repo_by_name_scopes_search(ask_home, tmp_path):
-    con = make(tmp_path, "one", {"a.md": "shared word\n"})
-    make(tmp_path, "two", {"b.md": "shared word\n"}, con=con)
+    con = make(tmp_path, "one", {"a.md": "intro\nnothing here\nshared word\n"})
+    make(tmp_path, "two", {"b.md": "intro\nnothing here\nshared word\n"}, con=con)
     result = answer(con, "shared", "employee", repo="two")
     assert {h["repo"] for h in result["hits"]} == {"two"}
+    check_quotes(con, result)
 
 
 def test_repo_by_path_inside_repo_resolves(ask_home, tmp_path):
-    con = make(tmp_path, "one", {"a.md": "shared word\n"})
-    make(tmp_path, "two", {"b.md": "shared word\n"}, con=con)
+    con = make(tmp_path, "one", {"a.md": "intro\nnothing here\nshared word\n"})
+    make(tmp_path, "two", {"b.md": "intro\nnothing here\nshared word\n"}, con=con)
     inside = str(tmp_path / "one" / "deeper")
     result = answer(con, "shared", "employee", repo=inside)
     assert {h["repo"] for h in result["hits"]} == {"one"}
+    check_quotes(con, result)
 
 
 @pytest.mark.parametrize("key", list(SECRETS))
@@ -196,6 +205,8 @@ def test_json_output_is_the_result_dict(two_repos, capsys):
     assert data["status"] == "answered" and data["kind"] == "search"
     assert set(data) == {"status", "kind", "message", "owners", "hits", "recent_committers"}
     assert set(data["hits"][0]) == {"repo", "path", "line", "quote"}
+    check_quotes(two_repos, data)
+    check_quotes(two_repos, answer(two_repos, "zorbquill", "employee"))
 
 
 def test_json_not_found_and_refused(two_repos, capsys):
@@ -210,7 +221,10 @@ def test_multiple_words_join_and_flags_anywhere(two_repos, capsys):
     assert main(["rbac", "employee"]) == 0
     capsys.readouterr()
     assert main(["zorbquill", "service", "--repo", "vault", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "answered"
+    data = json.loads(capsys.readouterr().out)
+    assert data["status"] == "answered"
+    check_quotes(two_repos, data)
+    check_quotes(two_repos, answer(two_repos, "zorbquill service", "employee", repo="vault"))
 
 
 def test_unknown_flag_and_missing_repo_value_are_usage_errors(two_repos, capsys):

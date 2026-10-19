@@ -29,7 +29,7 @@ def content_words(q: str) -> list[str]:
 
 
 def _and_group(words: list[str]) -> str:
-    return " AND ".join(f'"{w}"' for w in words)
+    return " AND ".join('"' + w.replace('"', '""') + '"' for w in words)
 
 
 def _match_expressions(words: list[str]) -> list[str]:

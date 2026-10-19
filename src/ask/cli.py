@@ -113,7 +113,7 @@ def _ask(args: list[str]) -> int:
     else:
         print(result["message"])
         for h in result["hits"]:
-            print(f"  {h['repo']}:{h['path']}:{h['line']}  {h['quote']}")
+            print(f"{h['repo']}:{h['path']}:{h['line']}  {h['quote']}")
     return EXIT_CODES[result["status"]]
 
 
