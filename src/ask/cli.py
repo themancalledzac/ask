@@ -1,13 +1,14 @@
-"""Command line entry point. Question answering is not implemented yet."""
+"""Command line entry point."""
 
+import json
 import sys
 from pathlib import Path
 
 from ask.access import can_see, get_role, set_role
+from ask.answer import answer
 from ask.model import REFUSED, ROLES, AskError
 from ask.store import add_repo, connect, list_repos, remove_repo, set_repo_role
 
-COMMANDS = ("add-repo", "list-repos", "remove-repo", "update-repo", "rbac")
 USAGE = 'usage: ask "<question>" | ask rbac [employee|guest] | ask add-repo|list-repos|remove-repo|update-repo'
 
 
@@ -79,10 +80,41 @@ REPO_COMMANDS = {
 }
 
 
-def _not_implemented(name: str) -> int:
-    """Placeholder for commands added in later tasks."""
-    print(f"{name}: not implemented yet", file=sys.stderr)
-    return 3
+EXIT_CODES = {"answered": 0, "not_found": 1, "refused": 2}
+
+
+def _parse_question(args: list[str]) -> tuple[str, bool, str | None]:
+    """Split argv into the question words, the --json switch and the --repo value."""
+    words, as_json, repo = [], False, None
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--json":
+            as_json = True
+        elif arg == "--repo":
+            if i + 1 >= len(args):
+                raise AskError('--repo needs a value. Run: ask "<question>" --repo <name>')
+            repo = args[i + 1]
+            i += 1
+        elif arg.startswith("--"):
+            raise AskError(f"Unknown option {arg}. {USAGE}")
+        else:
+            words.append(arg)
+        i += 1
+    return " ".join(words), as_json, repo
+
+
+def _ask(args: list[str]) -> int:
+    """Answer a question as the stored role and print text or JSON."""
+    question, as_json, repo = _parse_question(args)
+    result = answer(connect(), question, get_role(), repo)
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False))
+    else:
+        print(result["message"])
+        for h in result["hits"]:
+            print(f"  {h['repo']}:{h['path']}:{h['line']}  {h['quote']}")
+    return EXIT_CODES[result["status"]]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -100,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(REFUSED)
                 return 2
             return handler(args[1:])
-        return _not_implemented("question")
+        return _ask(args)
     except AskError as e:
         print(str(e), file=sys.stderr)
         return 3

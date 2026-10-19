@@ -39,8 +39,8 @@ def test_invalid_role_in_config_reads_as_guest(ask_home):
 
 
 def test_question_cannot_set_role(ask_home):
-    main(["rbac", "--role", "employee"])
-    main(["where is the thing", "--role", "employee"])
+    assert main(["rbac", "--role", "employee"]) == 3
+    assert main(["where is the thing", "--role", "employee"]) == 3
     assert get_role() == "guest"
 
 
