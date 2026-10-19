@@ -152,6 +152,8 @@ def test_syntax_characters_do_not_raise(ask_home, tmp_path, word):
         ("employ", "employee handbook"),
         ("query", "queries run nightly"),
         ("policy", "the policies page"),
+        ("play", "player settings"),
+        ("easy", "easygoing setup"),
     ],
 )
 def test_single_word_matches_longer_or_inflected_word(ask_home, tmp_path, question, text):
