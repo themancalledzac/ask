@@ -32,26 +32,61 @@ def test_stopwords_fixed_set():
     assert "api" not in STOPWORDS
 
 
-def test_strict_hit_needs_every_word(ask_home, tmp_path):
+def test_one_or_two_words_need_every_word(ask_home, tmp_path):
     con = build(tmp_path, {"a.md": "alpha beta\n\ngamma\n"})
     assert len(fts_search(con, ["alpha", "beta"], ["r"])) == 1
     assert fts_search(con, ["alpha", "gamma"], ["r"]) == []
 
 
-def test_fallback_allows_one_missing_word_with_three_words(ask_home, tmp_path):
+def test_two_words_with_one_present_is_not_found(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "alpha\n\nbeta\n"})
+    assert fts_search(con, ["alpha", "beta"], ["r"]) == []
+
+
+def test_three_words_with_one_present_is_not_found(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "alpha\n\nbeta\n"})
+    assert fts_search(con, ["alpha", "zzzz", "yyyy"], ["r"]) == []
+
+
+def test_three_words_need_two(ask_home, tmp_path):
     con = build(tmp_path, {"a.md": "alpha beta\n\ngamma only\n"})
     hits = fts_search(con, ["alpha", "beta", "zzzz"], ["r"])
     assert [(h.path, h.line) for h in hits] == [("a.md", 1)]
 
 
-def test_fallback_not_allowed_with_two_words(ask_home, tmp_path):
-    con = build(tmp_path, {"a.md": "alpha\n\nbeta\n"})
-    assert fts_search(con, ["alpha", "beta"], ["r"]) == []
+def test_five_words_need_three(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "one two three\n\none two\n"})
+    hits = fts_search(con, ["one", "two", "three", "four", "five"], ["r"])
+    assert [(h.path, h.line) for h in hits] == [("a.md", 1)]
 
 
-def test_fallback_cannot_drop_two_words(ask_home, tmp_path):
-    con = build(tmp_path, {"a.md": "alpha\n\nbeta\n"})
-    assert fts_search(con, ["alpha", "zzzz", "yyyy"], ["r"]) == []
+def test_more_covered_words_rank_first(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "alpha beta\n", "b.md": "alpha beta gamma\n"})
+    hits = fts_search(con, ["alpha", "beta", "gamma"], ["r"])
+    assert [h.path for h in hits] == ["b.md", "a.md"]
+
+
+def test_four_letter_word_matches_as_prefix(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "the production release\n"})
+    assert fts_search(con, ["prod"], ["r"])[0].line == 1
+
+
+def test_three_letter_word_does_not_match_as_prefix(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "the production release\n"})
+    assert fts_search(con, ["pro"], ["r"]) == []
+
+
+def test_chunk_quoting_the_question_is_dropped(ask_home, tmp_path):
+    files = {"log.md": "Q: where is the   Cache?\nthe cache lives in redis\n", "doc.md": "the cache lives in redis\n"}
+    con = build(tmp_path, files)
+    hits = fts_search(con, ["cache"], ["r"], question="Where is the cache?")
+    assert [h.path for h in hits] == ["doc.md"]
+    assert len(fts_search(con, ["cache"], ["r"])) == 2
+
+
+def test_short_question_is_not_treated_as_an_echo(ask_home, tmp_path):
+    con = build(tmp_path, {"a.md": "the cache lives in redis\n"})
+    assert len(fts_search(con, ["cache"], ["r"], question="cache?")) == 1
 
 
 def test_cites_line_with_most_content_words(ask_home, tmp_path):

@@ -34,7 +34,7 @@ def _resolve_repo(repos: list[Repo], ref: str) -> Repo | None:
 
 
 def _search(con: sqlite3.Connection, question: str, visible: list[Repo]) -> dict:
-    hits = fts_search(con, content_words(question), [r.name for r in visible])
+    hits = fts_search(con, content_words(question), [r.name for r in visible], question=question)
     if not hits:
         return _result("not_found", None, NOT_FOUND)
     return _result("answered", "search", "Found in:", hits)
