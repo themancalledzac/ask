@@ -23,6 +23,7 @@ Minutes are counted from the moment the clock started. "before clock" means befo
 | Owner question on a repo with no CODEOWNERS says so (org + recent committers) | T+70 | T+79 | 9 | 41b9c7b..f9f55a1: no-CODEOWNERS message + org + committers; --repo only when asking about the repo; 232 tests |
 | Whole-repo review (separate agent) | T+70 | T+78 | 8 | 0 Critical, 5 Important (secret redaction gaps, owner-before-name, non-UTF-8 filename, size check, porter vs prefix), 12 Minor |
 | Fix whole-repo review findings | T+79 | T+89 | 10 | PR #6 merged; 271 tests, eval 29/29; fix-wave re-review was never run |
-| README: MCP setup order, no-clone install with MCP, claude mcp add -s user, /mcp + ledger check | T+88 |  |  | started for real: builder on branch step-6-mcp-readme from final main d43c8eb |
+| README: MCP setup order, no-clone install with MCP, claude mcp add -s user, /mcp + ledger check | T+88 | T+92 | 4 | 05e7335: install, rbac, add-repo, claude mcp add -s user, /mcp + ledger check; install and stdio verified, claude mcp add not run; PR opened |
+| One hit per file; MCP up to 10 hits, CLI 3 (skipped) | T+92 | T+92 | 0 | stopped: timer over; briefed, not built |
 | Move submission tag to final main | T+89 | T+89 | 0 | submission tag moved to d43c8eb (merge of #6), verified |
-| Ship by the buzzer | T+56 |  |  | submission tagged at 0c77451 (T+53); repo private until just before the interview |
+| Ship by the buzzer | T+56 |  |  | final: submission tag on d43c8eb; README MCP setup in PR #7 |
