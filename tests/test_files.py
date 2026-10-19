@@ -2,7 +2,10 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from ask.files import list_files, read_text_lines
+from ask.store import add_repo, connect
 
 
 def git(root, *args):
@@ -136,3 +139,53 @@ def test_nul_in_first_8k_is_none_but_later_is_not(tmp_path):
 def test_invalid_utf8_is_none(tmp_path):
     p = write(tmp_path, "bad.txt", b"\xff\xfe abc")
     assert read_text_lines(p) is None
+
+
+def make_latin1_name(root):
+    bad = os.path.join(os.fsencode(root), b"caf\xe9.md")
+    try:
+        with open(bad, "wb") as f:
+            f.write(b"menu\n")
+    except OSError:
+        pytest.skip("filesystem refuses non-UTF-8 file names")
+
+
+def test_non_utf8_file_name_is_skipped_in_a_folder(ask_home, tmp_path):
+    root = tmp_path / "r"
+    write(root, "good.md", "good line\n")
+    make_latin1_name(root)
+    assert list_files(root) == [Path("good.md")]
+    assert add_repo(connect(), root).file_count == 1
+
+
+def test_non_utf8_file_name_is_skipped_in_git(ask_home, tmp_path):
+    root = tmp_path / "g"
+    write(root, "good.md", "good line\n")
+    make_latin1_name(root)
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    git(root, "add", ".")
+    git(root, "commit", "-q", "-m", "init")
+    assert list_files(root) == [Path("good.md")]
+    assert add_repo(connect(), root).file_count == 1
+
+
+def test_file_over_one_megabyte_is_never_read(tmp_path, monkeypatch):
+    big = tmp_path / "big.txt"
+    big.touch()
+    os.truncate(big, 2 * 1_048_576)
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("read a file over 1 MB")
+
+    monkeypatch.setattr(Path, "read_bytes", refuse)
+    monkeypatch.setattr(Path, "open", refuse)
+    monkeypatch.setattr("builtins.open", refuse)
+    assert read_text_lines(big) is None
+
+
+def test_surrogate_name_from_the_walk_is_dropped(tmp_path, monkeypatch):
+    bad = os.fsdecode(b"caf\xe9.md")
+    monkeypatch.setattr("ask.files._is_git_root", lambda root: False)
+    monkeypatch.setattr("ask.files.os.walk", lambda root: [(str(root), [], ["good.md", bad])])
+    monkeypatch.setattr("ask.files._wanted", lambda root, rel: True)
+    assert list_files(tmp_path) == [Path("good.md")]

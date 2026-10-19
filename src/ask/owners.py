@@ -114,7 +114,7 @@ def owners_for_path(rules: list[Rule], path: str) -> Rule | None:
 
 @dataclass(frozen=True)
 class Service:
-    """One services.json entry with its own keys. `owner_line` is the 1-based line of its `"owner":` key, or 0 when absent."""
+    """One services.json entry with its own keys. `owner_line` is the 1-based line inside this entry where `"owner":` holds its owner, or 0 when there is none."""
 
     name: str
     description: str | None
@@ -127,11 +127,34 @@ class Service:
     owner_line: int
 
 
-_OWNER_KEY = re.compile(r'"owner"\s*:')
+_SERVICES_KEY = re.compile(r'"services"\s*:\s*\[')
 
 
-def _name_line(name: str) -> re.Pattern:
-    return re.compile(r'"name"\s*:\s*' + re.escape(json.dumps(name)))
+def _entry_spans(text: str, count: int) -> list[tuple[int, int]] | None:
+    """0-based (first, last) line of each element of the services array, found by decoding it in place. None when the array cannot be located."""
+    found = _SERVICES_KEY.search(text)
+    if found is None:
+        return None
+    decoder = json.JSONDecoder()
+    spans = []
+    pos = found.end()
+    for _ in range(count):
+        while pos < len(text) and text[pos] in " \t\r\n,":
+            pos += 1
+        try:
+            _, end = decoder.raw_decode(text, pos)
+        except ValueError:
+            return None
+        spans.append((text.count("\n", 0, pos), text.count("\n", 0, end)))
+        pos = end
+    return spans
+
+
+def _owner_line(lines: list[str], span: tuple[int, int] | None, owner: object) -> int:
+    if span is None or not isinstance(owner, str):
+        return 0
+    pattern = re.compile(r'"owner"\s*:\s*' + re.escape(json.dumps(owner, ensure_ascii=False)))
+    return next((i + 1 for i in range(span[0], span[1] + 1) if pattern.search(lines[i])), 0)
 
 
 def load_services(root: Path) -> list[Service]:
@@ -139,26 +162,19 @@ def load_services(root: Path) -> list[Service]:
     lines = read_text_lines(Path(root) / "services.json")
     if lines is None:
         return []
+    text = "\n".join(lines)
     try:
-        data = json.loads("\n".join(lines))
+        data = json.loads(text)
     except ValueError:
         return []
     entries = data.get("services") if isinstance(data, dict) else None
     if not isinstance(entries, list):
         return []
+    spans = _entry_spans(text, len(entries)) or [None] * len(entries)
     out = []
-    cursor = 0
-    for entry in entries:
+    for entry, span in zip(entries, spans):
         if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
             continue
-        owner_line = 0
-        pattern = _name_line(entry["name"])
-        start = next((i for i in range(cursor, len(lines)) if pattern.search(lines[i])), None)
-        if start is not None:
-            cursor = start + 1
-            hit = next((i for i in range(start + 1, len(lines)) if _OWNER_KEY.search(lines[i])), None)
-            if hit is not None:
-                owner_line = hit + 1
         out.append(
             Service(
                 entry["name"],
@@ -169,7 +185,7 @@ def load_services(root: Path) -> list[Service]:
                 entry.get("repo"),
                 entry.get("doc"),
                 entry.get("slack_channel"),
-                owner_line,
+                _owner_line(lines, span, entry.get("owner")),
             )
         )
     return out
