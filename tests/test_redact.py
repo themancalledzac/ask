@@ -85,3 +85,63 @@ def test_redact_lines_applies_single_line_patterns_and_keeps_length():
     assert len(out) == 3
     assert out[0] == "x"
     assert AKIA not in out[1]
+
+
+VALUE = "abcd1234" + "efgh5678"
+AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/" + "bPxRfiCYEXAMPLEKEY"
+SK_LIVE = "sk_live_" + "abcdefghijklmnop1234"
+SK_TEST = "sk_test_" + "abcdefghijklmnop1234"
+RK_LIVE = "rk_live_" + "abcdefghijklmnop1234"
+BEARER = "abcdefghijklmnop" + "qrstuvwxyz123456"
+
+
+@pytest.mark.parametrize(
+    "line, secret",
+    [
+        (f'"password": "{VALUE}"', VALUE),
+        (f'"secret": "{VALUE}",', VALUE),
+        (f'"token": "{VALUE}"', VALUE),
+        (f"'api_key': '{VALUE}'", VALUE),
+        (f"SECRET_KEY = '{VALUE}'", VALUE),
+        (f"DB_PASSWORD={VALUE}", VALUE),
+        (f"github_token: {VALUE}", VALUE),
+        (f"Stripe_Secret = {VALUE}", VALUE),
+        (f"aws_secret_access_key = {AWS_SECRET}", AWS_SECRET),
+        (f'export STRIPE_KEY="{SK_LIVE}"', SK_LIVE),
+        (f"stripe {SK_TEST} test", SK_TEST),
+        (f"restricted {RK_LIVE}", RK_LIVE),
+        (f"Authorization: Bearer {BEARER}", BEARER),
+        (f'headers = {{"Authorization": "Bearer {BEARER}"}}', BEARER),
+    ],
+)
+def test_more_secret_shapes_are_redacted(line, secret):
+    out = redact(line)
+    assert secret not in out
+    assert "[redacted]" in out
+
+
+@pytest.mark.parametrize("password", ["pa/" + "ss1234", "p@" + "ss1234", "a/b@" + "c1234"])
+def test_url_password_with_slash_or_at_is_redacted(password):
+    out = redact(f"postgres://admin:{password}@db.example.com/app")
+    assert out == "postgres://[redacted]@db.example.com/app"
+
+
+def test_json_key_keeps_its_name_and_quotes():
+    assert redact(f'"password": "{VALUE}",') == '"password": "[redacted]",'
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "reset your password in the account settings page",
+        "send a Bearer header with each request",
+        "the primary key is the user id",
+    ],
+)
+def test_more_ordinary_text_is_untouched(line):
+    assert redact(line) == line
+
+
+def test_redact_lines_keeps_count_with_new_shapes():
+    lines = [f'"password": "{VALUE}"', "", f"Bearer {BEARER}"]
+    assert len(redact_lines(lines)) == 3
