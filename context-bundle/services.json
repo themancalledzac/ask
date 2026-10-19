@@ -1,0 +1,64 @@
+{
+  "services": [
+    {
+      "name": "atlas-api",
+      "description": "Core GraphQL/REST API behind the product",
+      "team": "Platform",
+      "owner": "Priya Nadkarni",
+      "owner_slack": "@priya",
+      "repo": "github.com/aperture/atlas-api",
+      "doc": "docs/deploy-pipeline.md",
+      "slack_channel": "#platform"
+    },
+    {
+      "name": "beacon",
+      "description": "Notification and alerting fan-out",
+      "team": "Platform",
+      "owner": "Priya Nadkarni",
+      "owner_slack": "@priya",
+      "repo": "github.com/aperture/beacon",
+      "doc": "docs/oncall.md",
+      "slack_channel": "#platform"
+    },
+    {
+      "name": "courier",
+      "description": "Outbound email/SMS to customers",
+      "team": "Growth",
+      "owner": "Marcus Webb",
+      "owner_slack": "@marcus",
+      "repo": "github.com/aperture/courier",
+      "doc": "docs/oncall.md",
+      "slack_channel": "#growth"
+    },
+    {
+      "name": "ledger",
+      "description": "Billing, invoices, usage metering",
+      "team": "Ops",
+      "owner": "Sofia Reyes",
+      "owner_slack": "@sofia",
+      "repo": "github.com/aperture/ledger",
+      "doc": "docs/data-warehouse.md",
+      "slack_channel": "#ops-billing"
+    },
+    {
+      "name": "forge",
+      "description": "Internal build and deploy pipeline",
+      "team": "Platform",
+      "owner": "Priya Nadkarni",
+      "owner_slack": "@priya",
+      "repo": "github.com/aperture/forge",
+      "doc": "docs/deploy-pipeline.md",
+      "slack_channel": "#platform"
+    },
+    {
+      "name": "lookout",
+      "description": "Customer-facing status dashboard",
+      "team": "Growth",
+      "owner": "Marcus Webb",
+      "owner_slack": "@marcus",
+      "repo": "github.com/aperture/lookout",
+      "doc": "docs/data-warehouse.md",
+      "slack_channel": "#growth"
+    }
+  ]
+}
