@@ -1,0 +1,12 @@
+{
+  "seen": [
+    {"path": "context-bundle", "role": "guest", "name": "context-bundle"},
+    {"path": ".", "role": "employee", "name": "ask"},
+    {"path": "../edens.zac", "role": "employee", "name": "edens.zac"},
+    {"path": "../edens.zac.backend", "role": "guest", "name": "edens.zac.backend"},
+    {"path": "eval/fixtures/codeowners", "role": "employee", "name": "codeowners-fixture"}
+  ],
+  "heldout": [
+    {"path": "../mempalace", "role": "employee", "name": "mempalace", "pin": "a938e3c"}
+  ]
+}
