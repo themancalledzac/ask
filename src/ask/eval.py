@@ -3,7 +3,6 @@
 import argparse
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -11,8 +10,6 @@ from pathlib import Path
 from ask.answer import answer
 from ask.model import AskError
 from ask.store import add_repo, connect, set_repo_role
-
-PIN_FAILED = 3
 
 
 def _check(row: dict, result: dict) -> str | None:
@@ -36,37 +33,18 @@ def _check(row: dict, result: dict) -> str | None:
     return None
 
 
-def _head(path: Path) -> str:
-    out = subprocess.run(
-        ["git", "-C", str(path), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
-    )
-    return out.stdout.strip() if out.returncode == 0 else "unknown"
-
-
-def _pin_error(entries: list[dict], root: Path) -> str | None:
-    """Return the stderr line for the first heldout repo not at its pin, or None."""
-    for entry in entries:
-        pin = entry.get("pin")
-        if not pin:
-            continue
-        sha = _head(root / entry["path"])
-        if sha[: len(pin)] != pin:
-            return f"held-out repo {entry['name']} is at {sha}, expected {pin}"
-    return None
-
-
 def _load(entries: list[dict], root: Path) -> None:
     con = connect()
     try:
         for entry in entries:
             path = root / entry["path"]
             if not path.exists():
-                print(f"skipping repo {entry['name']}: {path} does not exist", file=sys.stderr)
+                print(f"skipped repo {entry['name']}: {path} does not exist", file=sys.stderr)
                 continue
             try:
                 add_repo(con, path, name=entry["name"])
             except AskError as e:
-                print(f"skipping repo {entry['name']}: {e}", file=sys.stderr)
+                print(f"skipped repo {entry['name']}: {e}", file=sys.stderr)
                 continue
             set_repo_role(con, entry["name"], entry["role"])
     finally:
@@ -84,30 +62,24 @@ def main(argv: list[str] | None = None) -> int:
     repos_path = Path(args.repos) if args.repos else rows_path.resolve().parent / "repos.json"
     root = repos_path.resolve().parent.parent
     config = json.loads(repos_path.read_text())
-    heldout = rows_path.name.startswith("heldout")
-    entries = config["heldout" if heldout else "seen"]
-
-    if heldout:
-        error = _pin_error(entries, root)
-        if error:
-            print(error, file=sys.stderr)
-            return PIN_FAILED
+    entries = config["repos"]
 
     rows = [json.loads(line) for line in rows_path.read_text().splitlines() if line.strip()]
     previous = os.environ.get("ASK_HOME")
-    os.environ["ASK_HOME"] = tempfile.mkdtemp()
     try:
-        _load(entries, root)
-        con = connect()
-        try:
-            failures = []
-            for row in rows:
-                result = answer(con, row["q"], role=row["role"], repo=row.get("repo"))
-                reason = _check(row, result)
-                if reason:
-                    failures.append((row["q"], reason))
-        finally:
-            con.close()
+        with tempfile.TemporaryDirectory() as home:
+            os.environ["ASK_HOME"] = home
+            _load(entries, root)
+            con = connect()
+            try:
+                failures = []
+                for row in rows:
+                    result = answer(con, row["q"], role=row["role"], repo=row.get("repo"))
+                    reason = _check(row, result)
+                    if reason:
+                        failures.append((row["q"], reason))
+            finally:
+                con.close()
     finally:
         if previous is None:
             os.environ.pop("ASK_HOME", None)

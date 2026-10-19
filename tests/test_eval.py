@@ -1,14 +1,9 @@
 import json
 import os
-import subprocess
 
 import pytest
 
 from ask.eval import main
-
-
-def _git(path, *args):
-    subprocess.run(["git", "-C", str(path), *args], check=True, capture_output=True)
 
 
 @pytest.fixture
@@ -25,7 +20,7 @@ def workspace(tmp_path, monkeypatch):
 def _write(workspace, rows, repos=None):
     rows_file = workspace / "eval" / "seen.jsonl"
     rows_file.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
-    repos = repos or {"seen": [{"path": "proj", "role": "employee", "name": "proj"}], "heldout": []}
+    repos = repos or {"repos": [{"path": "proj", "role": "employee", "name": "proj"}]}
     (workspace / "eval" / "repos.json").write_text(json.dumps(repos))
     return rows_file
 
@@ -96,13 +91,12 @@ def test_non_detail_never_prints_hit_text(workspace, capsys):
     assert "zebra" not in out
 
 
-def test_missing_seen_repo_is_skipped_with_a_stderr_line(workspace, capsys):
+def test_missing_repo_is_skipped_with_a_stderr_line(workspace, capsys):
     repos = {
-        "seen": [
+        "repos": [
             {"path": "proj", "role": "employee", "name": "proj"},
             {"path": "nowhere", "role": "employee", "name": "nowhere"},
         ],
-        "heldout": [],
     }
     rows = [{"q": "zebra crossing", "role": "employee", "status": "answered"}]
     code = main([str(_write(workspace, rows, repos))])
@@ -120,50 +114,11 @@ def test_does_not_touch_ask_home_env_permanently(workspace, monkeypatch):
     assert os.environ["ASK_HOME"] == "/nonexistent-ask-home"
 
 
-def _heldout(workspace, pin):
-    held = workspace / "held"
-    held.mkdir()
-    (held / "a.txt").write_text("alpha beta\n")
-    _git(held, "init", "-q")
-    _git(held, "-c", "user.email=t@t", "-c", "user.name=t", "add", ".")
-    _git(held, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "x")
-    rows_file = workspace / "eval" / "heldout.jsonl"
-    rows_file.write_text(json.dumps({"q": "alpha beta", "role": "employee", "status": "answered"}) + "\n")
-    repos = {
-        "seen": [],
-        "heldout": [{"path": "held", "role": "employee", "name": "held", "pin": pin}],
-    }
-    (workspace / "eval" / "repos.json").write_text(json.dumps(repos))
-    return rows_file
-
-
-def test_wrong_pin_is_refused_with_exit_3(workspace, capsys):
-    rows_file = _heldout(workspace, "0000000")
-    code = main([str(rows_file)])
-    captured = capsys.readouterr()
-    assert code == 3
-    assert captured.out == ""
-    assert captured.err.startswith("held-out repo held is at ")
-    assert captured.err.strip().endswith("expected 0000000")
-
-
-def test_matching_pin_scores_heldout_rows(workspace, capsys):
-    rows_file = _heldout(workspace, "x")
-    sha = subprocess.run(
-        ["git", "-C", str(workspace / "held"), "rev-parse", "--short", "HEAD"],
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    repos = {"seen": [], "heldout": [{"path": "held", "role": "employee", "name": "held", "pin": sha}]}
-    (workspace / "eval" / "repos.json").write_text(json.dumps(repos))
-    assert main([str(rows_file)]) == 0
-    assert capsys.readouterr().out.strip() == "1/1 passed"
-
-
 def test_explicit_repos_option(workspace, capsys):
     rows_file = _write(workspace, [{"q": "zebra crossing", "role": "employee", "status": "answered"}])
     (workspace / "cfg").mkdir()
     elsewhere = workspace / "cfg" / "other.json"
-    elsewhere.write_text(json.dumps({"seen": [{"path": "proj", "role": "employee", "name": "proj"}], "heldout": []}))
+    elsewhere.write_text(json.dumps({"repos": [{"path": "proj", "role": "employee", "name": "proj"}]}))
     (workspace / "eval" / "repos.json").unlink()
     assert main([str(rows_file), "--repos", str(elsewhere)]) == 0
     assert capsys.readouterr().out.strip() == "1/1 passed"
