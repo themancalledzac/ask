@@ -33,17 +33,32 @@ def content_words(q: str) -> list[str]:
     return list(seen)
 
 
+def _prefixes(word: str) -> list[str]:
+    """Prefixes a longer token may start with to count as this word: the word itself from 4 letters, a final y as i, and the first 5 letters."""
+    out = []
+    if len(word) >= PREFIX_MIN:
+        out.append(word)
+        if word.endswith("y"):
+            out.append(word[:-1] + "i")
+    if len(word) >= STEM:
+        out.append(word[:STEM])
+    return list(dict.fromkeys(out))
+
+
+def _quoted(text: str) -> str:
+    return '"' + text.replace('"', '""') + '"'
+
+
 def _term(word: str) -> str:
-    quoted = '"' + word.replace('"', '""') + '"'
-    return quoted + "*" if len(word) >= PREFIX_MIN else quoted
+    """The FTS5 query for one word. It matches every token `_covers` accepts, so the Python check only narrows."""
+    prefixes = _prefixes(word)
+    if not prefixes:
+        return _quoted(word)
+    return " OR ".join(_quoted(p) + "*" for p in prefixes)
 
 
 def _covers(word: str, token: str) -> bool:
-    if token == word:
-        return True
-    if len(word) >= PREFIX_MIN and token.startswith(word):
-        return True
-    return len(word) >= STEM and len(token) >= STEM and word[:STEM] == token[:STEM]
+    return token == word or any(token.startswith(p) for p in _prefixes(word))
 
 
 def _score(words: list[str], tokens: list[str]) -> int:

@@ -1,5 +1,6 @@
 import pytest
 
+from ask.answer import answer
 from ask.search import STOPWORDS, content_words, fts_search
 from ask.store import add_repo, connect
 
@@ -142,3 +143,19 @@ def test_limit_and_repo_filter(ask_home, tmp_path):
 def test_syntax_characters_do_not_raise(ask_home, tmp_path, word):
     con = build(tmp_path, {"a.md": "plain text\n"})
     fts_search(con, [word], ["r"])
+
+
+@pytest.mark.parametrize(
+    "question, text",
+    [
+        ("deploy", "the deployment guide lives here"),
+        ("employ", "employee handbook"),
+        ("query", "queries run nightly"),
+        ("policy", "the policies page"),
+    ],
+)
+def test_single_word_matches_longer_or_inflected_word(ask_home, tmp_path, question, text):
+    con = build(tmp_path, {"a.md": text + "\n"})
+    result = answer(con, question, "employee")
+    assert result["status"] == "answered"
+    assert [(h["path"], h["line"], h["quote"]) for h in result["hits"]] == [("a.md", 1, text)]
