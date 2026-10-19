@@ -30,7 +30,7 @@ Left out on purpose: live `gh api` owner lookups, Slack and Notion connectors, a
 
 ## Safety and exposure
 
-The role is self-asserted today: anyone can run `ask rbac employee`. It stands in for SSO login, where the role would come from identity-provider groups. Secrets (API keys, passwords in URLs, JWTs, private keys) are redacted at index time and `.env*` files are skipped, but a real rollout needs secret scanning at the source. Internal and external repos map to the employee and guest roles. Anything an agent can run can change the role, so the planned MCP tool exposes only `ask`, not `rbac` or the repo commands.
+The role is self-asserted today: anyone can run `ask rbac employee`. It stands in for SSO login, where the role would come from identity-provider groups. Secrets (API keys, passwords in URLs, JWTs, private keys) are redacted at index time and `.env*` files are skipped, but a real rollout needs secret scanning at the source. Internal and external repos map to the employee and guest roles. Anything an agent can run can change the role, so the MCP tool exposes only `ask`, not `rbac` or the repo commands, and a test (`tests/test_mcp.py`) proves its schema has no role field.
 
 ## How I used AI tooling
 
