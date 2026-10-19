@@ -1,0 +1,210 @@
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+from conftest import check_quotes
+
+from ask.answer import answer
+from ask.cli import main
+from ask.model import NOT_FOUND
+from ask.owners import load_services, recent_committers
+from ask.store import add_repo, connect, set_repo_role
+
+ROOT = Path(__file__).resolve().parent.parent
+BUNDLE = ROOT / "context-bundle"
+CODEOWNERS_FIXTURE = ROOT / "eval" / "fixtures" / "codeowners"
+
+SHARED_DESCRIPTIONS = {
+    "services": [
+        {"name": "alpha", "description": "Payments intake", "team": "A", "owner": "Ada One"},
+        {"name": "beta", "description": "Payments refunds", "team": "B", "owner": "Bo Two"},
+        {"name": "gamma", "description": "Refunds ledger only", "team": "C", "owner": "Cy Three"},
+    ]
+}
+
+
+def git(root, *args, author=None):
+    cmd = ["git", "-C", str(root), "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"]
+    if author:
+        cmd += ["-c", f"user.name={author}", "-c", f"user.email={author.split()[0].lower()}@x.test"]
+    subprocess.run(cmd + list(args), check=True, capture_output=True)
+
+
+@pytest.fixture
+def bundle(ask_home):
+    con = connect()
+    add_repo(con, BUNDLE, "bundle")
+    return con
+
+
+@pytest.fixture
+def owned(ask_home, tmp_path):
+    root = tmp_path / "owned"
+    shutil.copytree(CODEOWNERS_FIXTURE, root)
+    git(root, "init", "-q")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "first", author="Ana Lee")
+    api = root / "services" / "billing" / "api.py"
+    api.write_text(api.read_text() + "\nchanged = 1\n")
+    git(root, "commit", "-qam", "second", author="Ben Ko")
+    api.write_text(api.read_text() + "\nchanged = 2\n")
+    git(root, "commit", "-qam", "third", author="Ben Ko")
+    con = connect()
+    add_repo(con, root, "owned")
+    return con
+
+
+def owner_names(result):
+    return [o["name"] for o in result["owners"]]
+
+
+def test_ledger_owner_cites_services_json_owner_line(bundle):
+    result = answer(bundle, "who owns ledger? billing export looks off", "employee")
+    assert result["status"] == "answered"
+    assert result["kind"] == "owner"
+    assert owner_names(result) == ["Sofia Reyes"]
+    owner = result["owners"][0]
+    assert owner["team"] == "Ops"
+    assert owner["citation"] == {
+        "repo": "bundle",
+        "path": "services.json",
+        "line": 37,
+        "quote": '"owner": "Sofia Reyes",',
+    }
+    assert result["hits"] == []
+    assert result["recent_committers"] == []
+    check_quotes(bundle, result)
+
+
+def test_billing_description_word_names_ledger_owner(bundle):
+    result = answer(bundle, "who owns billing now? I thought it was someone who left", "employee")
+    assert result["status"] == "answered"
+    assert owner_names(result) == ["Sofia Reyes"]
+    check_quotes(bundle, result)
+
+
+def test_unknown_service_is_not_found(bundle):
+    result = answer(bundle, "who owns kubernetes?", "employee")
+    assert result["status"] == "not_found"
+    assert result["message"] == NOT_FOUND
+    assert result["owners"] == [] and result["hits"] == []
+
+
+def test_review_question_names_forge_owner(bundle):
+    result = answer(bundle, "who should review my PR for forge?", "employee")
+    assert result["status"] == "answered"
+    assert owner_names(result) == ["Priya Nadkarni"]
+    assert result["owners"][0]["citation"]["line"] == 47
+    check_quotes(bundle, result)
+
+
+def test_hyphenated_name_needs_every_part(bundle):
+    assert owner_names(answer(bundle, "who owns atlas-api?", "employee")) == ["Priya Nadkarni"]
+    assert answer(bundle, "who owns atlas?", "employee")["status"] == "not_found"
+
+
+def test_codeowners_path_gives_last_match_with_committers(owned):
+    result = answer(owned, "who owns services/billing/api.py?", "employee")
+    assert result["status"] == "answered"
+    assert result["kind"] == "owner"
+    assert result["owners"] == [
+        {
+            "name": "@fixture-ana",
+            "team": None,
+            "citation": {
+                "repo": "owned",
+                "path": ".github/CODEOWNERS",
+                "line": 5,
+                "quote": "/services/billing/api.py @fixture-ana",
+            },
+        }
+    ]
+    assert result["recent_committers"] == [
+        {"name": "Ben Ko", "commits": 2},
+        {"name": "Ana Lee", "commits": 1},
+    ]
+    check_quotes(owned, result)
+
+
+def test_codeowners_directory_question(owned):
+    result = answer(owned, "who owns services/billing/?", "employee")
+    assert owner_names(result) == ["@fixture/billing", "@fixture-ben"]
+    assert result["owners"][0]["citation"]["line"] == 4
+    check_quotes(owned, result)
+
+
+def test_codeowners_rule_with_no_owners_is_not_found(owned):
+    result = answer(owned, "who owns vendor/lib.txt?", "employee")
+    assert result["status"] == "not_found"
+    assert result["message"] == NOT_FOUND
+
+
+def test_cli_labels_committers_as_not_owners(owned, capsys):
+    assert main(["rbac", "employee"]) == 0
+    capsys.readouterr()
+    assert main(["who", "owns", "services/billing/api.py?"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "Owner of services/billing/api.py:"
+    assert lines[1] == "@fixture-ana  owned:.github/CODEOWNERS:5  /services/billing/api.py @fixture-ana"
+    assert lines[2] == "Recent committers, not owners: Ben Ko (2), Ana Lee (1)"
+
+
+def test_cli_owner_line_shows_team(bundle, capsys):
+    assert main(["rbac", "employee"]) == 0
+    capsys.readouterr()
+    assert main(["who", "owns", "ledger?"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines == [
+        "Owner of ledger:",
+        'Sofia Reyes (Ops)  bundle:services.json:37  "owner": "Sofia Reyes",',
+    ]
+
+
+def test_guest_gets_exact_not_found_for_employee_services(ask_home, tmp_path, capsys):
+    root = tmp_path / "private"
+    root.mkdir()
+    shutil.copy(BUNDLE / "services.json", root / "services.json")
+    con = connect()
+    add_repo(con, root, "private")
+    assert answer(con, "who owns ledger?", "employee")["status"] == "answered"
+    result = answer(con, "who owns ledger?", "guest")
+    assert result["status"] == "not_found"
+    assert result["message"] == NOT_FOUND
+    assert main(["who", "owns", "ledger?"]) == 1
+    assert capsys.readouterr().out == NOT_FOUND + "\n"
+
+
+def test_owner_never_comes_from_markdown(ask_home, tmp_path):
+    root = tmp_path / "docsonly"
+    root.mkdir()
+    (root / "README.md").write_text("The zorbit service is owned by Zed Quill.\nZed Quill owns zorbit and its alerts.\n")
+    con = connect()
+    add_repo(con, root, "docsonly")
+    set_repo_role(con, "docsonly", "guest")
+    result = answer(con, "who owns zorbit?", "employee")
+    assert result["status"] == "not_found"
+    assert result["message"] == NOT_FOUND
+    assert "Zed Quill" not in json.dumps(result)
+
+
+def test_description_word_shared_by_two_services_is_not_found(ask_home, tmp_path):
+    root = tmp_path / "shared"
+    root.mkdir()
+    (root / "services.json").write_text(json.dumps(SHARED_DESCRIPTIONS, indent=2))
+    con = connect()
+    add_repo(con, root, "shared")
+    assert answer(con, "who owns payments?", "employee")["status"] == "not_found"
+    assert owner_names(answer(con, "who owns intake?", "employee")) == ["Ada One"]
+
+
+def test_load_services_finds_owner_lines():
+    services = load_services(BUNDLE)
+    assert [s.name for s in services][:2] == ["atlas-api", "beacon"]
+    assert {s.name: s.owner_line for s in services}["ledger"] == 37
+    assert services[0].owner_line == 7
+
+
+def test_recent_committers_outside_git_is_empty(tmp_path):
+    assert recent_committers(tmp_path, None) == []

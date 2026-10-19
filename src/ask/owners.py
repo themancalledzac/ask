@@ -1,8 +1,17 @@
+"""CODEOWNERS rules, services.json services and recent git committers."""
+
+import json
 import re
+import subprocess
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ask.files import read_text_lines
+from ask.search import content_words
+
 CODEOWNERS_LOCATIONS = (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS")
+OWNER_WORDS = frozenset("own owns owner owners owned review reviewer reviewers".split())
 
 
 @dataclass(frozen=True)
@@ -101,3 +110,111 @@ def owners_for_path(rules: list[Rule], path: str) -> Rule | None:
         if rule.regex.match(path):
             return rule
     return None
+
+
+@dataclass(frozen=True)
+class Service:
+    """One services.json entry with its own keys. `owner_line` is the 1-based line of its `"owner":` key, or 0 when absent."""
+
+    name: str
+    description: str | None
+    team: str | None
+    owner: str | None
+    owner_slack: str | None
+    repo: str | None
+    doc: str | None
+    slack_channel: str | None
+    owner_line: int
+
+
+_OWNER_KEY = re.compile(r'"owner"\s*:')
+
+
+def _name_line(name: str) -> re.Pattern:
+    return re.compile(r'"name"\s*:\s*' + re.escape(json.dumps(name)))
+
+
+def load_services(root: Path) -> list[Service]:
+    """Read services.json at a repo root. A missing or malformed file gives an empty list."""
+    lines = read_text_lines(Path(root) / "services.json")
+    if lines is None:
+        return []
+    try:
+        data = json.loads("\n".join(lines))
+    except ValueError:
+        return []
+    entries = data.get("services") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        return []
+    out = []
+    cursor = 0
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+            continue
+        owner_line = 0
+        pattern = _name_line(entry["name"])
+        start = next((i for i in range(cursor, len(lines)) if pattern.search(lines[i])), None)
+        if start is not None:
+            hit = next((i for i in range(start + 1, len(lines)) if _OWNER_KEY.search(lines[i])), None)
+            if hit is not None:
+                owner_line = hit + 1
+                cursor = hit + 1
+        out.append(
+            Service(
+                entry["name"],
+                entry.get("description"),
+                entry.get("team"),
+                entry.get("owner"),
+                entry.get("owner_slack"),
+                entry.get("repo"),
+                entry.get("doc"),
+                entry.get("slack_channel"),
+                owner_line,
+            )
+        )
+    return out
+
+
+def _contains_run(words: list[str], run: list[str]) -> bool:
+    size = len(run)
+    return size > 0 and any(words[i : i + size] == run for i in range(len(words) - size + 1))
+
+
+def resolve_service(question: str, services: list[Service]) -> list[Service]:
+    """Services named in the question, matching every part of a hyphenated name in order. With no name match, a word that is a description word of exactly one service names it."""
+    words = [w for w in content_words(question) if w not in OWNER_WORDS]
+    named = [s for s in services if _contains_run(words, content_words(s.name))]
+    if named:
+        return named
+    holders: dict[str, set[int]] = {}
+    for index, s in enumerate(services):
+        for token in content_words(s.description or ""):
+            holders.setdefault(token, set()).add(index)
+    picked: list[int] = []
+    for word in words:
+        found = holders.get(word, set())
+        if len(found) == 1 and next(iter(found)) not in picked:
+            picked.append(next(iter(found)))
+    return [services[i] for i in picked]
+
+
+def recent_committers(root: Path, path: str | None, n: int = 3) -> list[dict]:
+    """Top committers by count over the last 200 commits touching the path, from git log. These are never owners. Outside a git work tree, or on any git failure, the list is empty."""
+    try:
+        inside = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+        )
+        if inside.returncode != 0 or inside.stdout.strip() != "true":
+            return []
+        cmd = ["git", "-C", str(root), "log", "-n", "200", "--format=%an"]
+        if path:
+            cmd += ["--", path]
+        log = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError:
+        return []
+    if log.returncode != 0:
+        return []
+    counts = Counter(name for name in log.stdout.split("\n") if name)
+    return [{"name": name, "commits": c} for name, c in counts.most_common(n)]

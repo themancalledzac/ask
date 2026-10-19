@@ -16,6 +16,7 @@ def ask_home(tmp_path, monkeypatch):
 
 def check_quotes(con, result):
     paths = {r.name: Path(r.path) for r in list_repos(con)}
-    for h in result["hits"]:
-        lines = redact_lines(read_text_lines(paths[h["repo"]] / h["path"]))
-        assert lines[h["line"] - 1].strip() == h["quote"]
+    cites = list(result["hits"]) + [o["citation"] for o in result.get("owners", [])]
+    for c in cites:
+        lines = redact_lines(read_text_lines(paths[c["repo"]] / c["path"]))
+        assert lines[c["line"] - 1].strip() == c["quote"]
