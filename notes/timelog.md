@@ -22,5 +22,7 @@ Minutes are counted from the moment the clock started. "before clock" means befo
 | Test README uvx one-liner on public repo | T+70 | T+70 | 0 | PUBLIC; fresh uv cache + ASK_HOME: help, rbac, add-repo, Sofia Reyes services.json:37, deploy-pipeline.md:11; @submission installs too |
 | Owner question on a repo with no CODEOWNERS says so (org + recent committers) | T+70 | T+79 | 9 | 41b9c7b..f9f55a1: no-CODEOWNERS message + org + committers; --repo only when asking about the repo; 232 tests |
 | Whole-repo review (separate agent) | T+70 | T+78 | 8 | 0 Critical, 5 Important (secret redaction gaps, owner-before-name, non-UTF-8 filename, size check, porter vs prefix), 12 Minor |
-| Fix whole-repo review findings | T+79 |  |  | fix wave: redaction gaps, owner-before-name, non-UTF-8 names, size check, porter vs prefix, config/git/dedupe, docs |
+| Fix whole-repo review findings | T+79 | T+89 | 10 | PR #6 merged; 271 tests, eval 29/29; fix-wave re-review was never run |
+| README: MCP setup order, no-clone install with MCP, claude mcp add -s user, /mcp + ledger check | T+88 |  |  | started for real: builder on branch step-6-mcp-readme from final main d43c8eb |
+| Move submission tag to final main | T+89 | T+89 | 0 | submission tag moved to d43c8eb (merge of #6), verified |
 | Ship by the buzzer | T+56 |  |  | submission tagged at 0c77451 (T+53); repo private until just before the interview |

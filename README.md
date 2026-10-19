@@ -13,7 +13,7 @@ The write-up for the take-home is in [notes/WRITEUP.md](notes/WRITEUP.md).
 
 ## Run it
 
-One command, once the repo is public:
+One command, without installing:
 
 ```
 uvx --from git+https://github.com/themancalledzac/ask ask --help
@@ -93,15 +93,80 @@ Exit codes:
 
 ## Use it from an agent (MCP)
 
-`ask-mcp` runs an MCP server over stdio with one tool, `ask(question, repo?)`. It returns the same JSON as `ask --json`. To register it with Claude Code, run this from the clone:
+`ask-mcp` runs an MCP server over stdio with one tool, `ask(question, repo?)`. It returns the same JSON as `ask --json`. Follow the steps in order. The server reads the role and the index that the CLI writes, and it has no tool to set either. So set the role and add a repo with the CLI before you register the server.
+
+You need uv and Claude Code. No clone is needed.
+
+### 1. Install
 
 ```
-claude mcp add ask -- uv run --directory <path-to-clone> --extra mcp ask-mcp
+uv tool install "ask[mcp] @ git+https://github.com/themancalledzac/ask"
 ```
 
-The role still comes from `ask rbac`. The server reads it on every call, and the tool has no role parameter. The server exposes no tool that changes roles or repos.
+This puts both `ask` and `ask-mcp` on your PATH. The last line of its output is:
 
-To run the MCP tests too:
+```
+Installed 2 executables: ask, ask-mcp
+```
+
+If your shell can't find `ask` after this, run `uv tool update-shell` and open a new terminal.
+
+### 2. Set your role
+
+```
+$ ask rbac employee
+role set to employee
+```
+
+### 3. Add a repo
+
+The check in step 5 uses the context bundle that ships in this repo. Without a clone, clone it just for the bundle:
+
+```
+$ git clone --depth 1 https://github.com/themancalledzac/ask /tmp/ask-src
+$ ask add-repo /tmp/ask-src/context-bundle
+added context-bundle (8 files, role employee)
+```
+
+Any folder with a `services.json` or a git repo of your own works too. The check below only works with `context-bundle` added.
+
+### 4. Register the server for every folder
+
+```
+claude mcp add -s user ask -- ask-mcp
+```
+
+`-s user` makes the server available in every folder, not only the one you ran it in.
+
+If you work from a clone instead of the installed tool, register this form:
+
+```
+claude mcp add -s user ask -- uv run --directory <path-to-clone> --extra mcp ask-mcp
+```
+
+### 5. Check it works
+
+In Claude Code, run `/mcp`. `ask` should be listed as connected. Then ask Claude "who owns ledger?". The answer should be Sofia Reyes (Ops), cited `context-bundle:services.json:37`. The same question from the CLI:
+
+```
+$ ask "who owns ledger?"
+Owner of ledger:
+Sofia Reyes (Ops)  context-bundle:services.json:37  "owner": "Sofia Reyes",
+```
+
+Steps 1 to 3 and the ledger question were run in a temp `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR` and `ASK_HOME`. `ask-mcp` was started there and answered `initialize`, `tools/list` and a `tools/call` for "who owns ledger?" over stdio with the same answer. The `claude mcp add` commands and the `/mcp` check were not run against a real Claude Code config.
+
+### Notes
+
+The role still comes from `ask rbac`. The server reads it on every call, and the tool has no role parameter. The server exposes no tool that changes roles or repos. To change either, use the CLI. The server picks up the change on the next call.
+
+To try the CLI once without installing:
+
+```
+uvx --from git+https://github.com/themancalledzac/ask ask --help
+```
+
+To run the MCP tests from a clone:
 
 ```
 uv run --extra mcp pytest -q
