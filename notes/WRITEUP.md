@@ -2,22 +2,44 @@
 
 ## What I built and why
 
-`ask` is a Python CLI that answers "where does X live / who owns X" from repos you add, with a `repo:path:line` citation on every answer. It indexes every git-tracked file (code included) into SQLite FTS5, and only the standard library is used. Two roles, employee and guest, decide which repos a question can see. Owner questions ("who owns X", "who should review X") are answered only from `services.json` or CODEOWNERS (GitHub's rules, last match wins). They never come from doc text. Recent git committers can be shown, labelled as not owners.
+`ask` is a Python CLI that answers "where does X live / who owns X" from repos you add. Every answer cites `repo:path:line`, and a test checks that the quoted text is on that line. It indexes every git-tracked file (code included) into SQLite FTS5 and uses only the standard library. Two roles, employee and guest, decide which repos a question can see.
 
-Left out on purpose: Slack and Notion connectors, a web UI, real login, a model writing answers, live GitHub lookups, and a stale-docs report.
+I scoped it to three things that had to be true. First, it works on a repo it has never seen, because the interview pairs on their repo. So the bundle is added with `ask add-repo` like any other folder. Second, owner answers come only from `services.json` or CODEOWNERS (GitHub's rules, last match wins), never from doc text. Recent git committers can be shown, labelled as not owners. Third, a weak match says "Not found in added repos." instead of guessing.
+
+The eval scores 29/29 on the seen rows, which include all 12 bundle questions (notes/SCOREBOARD.md). 200 tests pass.
+
+Left out on purpose: live `gh api` owner lookups, Slack and Notion connectors, a web UI, real SSO, a model writing answers, and a stale-docs report.
 
 ## How I'd attack the real problem
 
-To be written.
+"People can't find context" is a routing problem more than a search problem. The leverage is in reading the systems that already hold the answer, and in putting the answer where people already ask.
+
+- Owners from systems of record. CODEOWNERS and a service catalog (Backstage `catalog-info.yaml`, or `services.json` here) already say who owns what. CODEOWNERS names teams, so I'd expand teams into people through GitHub teams or the identity provider. Nobody maintains a second owner list.
+- Meet people where they ask. The same answer function behind a Slack bot, an MCP tool for coding agents, and the CLI. One index, three front ends.
+- Unanswered questions become doc tasks. A not-found question with a known owner opens a task for that owner: "people asked X, nothing answers it."
+- Freshness. Flag docs that disagree with `services.json`. The bundle's `services-overview.md` says its own table "goes stale fast", and someone asked "who owns billing now? I thought it was someone who left".
+- The question log is the demand signal. It shows which systems people ask about most, which tells you which docs to write first.
 
 ## What I'd measure
 
-To be written.
+- Time to an answer, from question to cited reply.
+- The not-found rate, and the actual not-found questions. Those are the doc backlog.
+- How often someone still pings a person after asking. That is the real test of whether the answer was good enough.
+- Wrong-owner reports, from a "this is wrong" button on each answer.
+- The eval score, run in CI on every change, so a match-rule change that breaks real questions fails the build.
 
 ## Safety and exposure
 
-`ask rbac <role>` is self-asserted. Anyone at the keyboard can run `ask rbac employee`. It stands in for SSO login, where the role would come from identity-provider group membership. Secrets (API keys, passwords in URLs, JWTs, private keys) are redacted before text reaches the index, and `.env*` files are never read.
+The role is self-asserted today: anyone can run `ask rbac employee`. It stands in for SSO login, where the role would come from identity-provider groups. Secrets (API keys, passwords in URLs, JWTs, private keys) are redacted at index time and `.env*` files are skipped, but a real rollout needs secret scanning at the source. Internal and external repos map to the employee and guest roles. Anything an agent can run can change the role, so the planned MCP tool exposes only `ask`, not `rbac` or the repo commands.
 
 ## How I used AI tooling
 
-See `notes/AI-LOG.md`.
+Tools: Claude Code, with Opus as the controller, Sonnet for builders and reviewers, and Haiku for dashboard updates. The full log is notes/AI-LOG.md.
+
+- Delegated: each build task went to one builder agent, then a separate reviewer agent. A different agent wrote the eval rows, so no builder graded its own work. Before the build, a fresh agent read the plan and listed 30-odd things it would have to guess.
+- Kept by hand: the risk ranking and the access and correctness rules, the redaction ruling, reading every review, and running the bundle questions end to end as employee and as guest.
+- Where agents were wrong:
+  - Task 4's quote check only saw hits on a chunk's first line, so it could not catch a wrong line number. The reviewer caught it.
+  - Task 5's CODEOWNERS `/*` matched nested files. The reviewer caught it.
+  - The strict all-words match rule answered only 4 of 12 bundle questions, and the questions log "answered" every question by quoting it. No agent caught either. I found both by running the real questions, and replaced the rule with a 60% content-word rule.
+  - Task 7 let words inside a path ("billing" in `services/billing/api.py`) match a service, so a path CODEOWNERS marks as unowned was answered with the ledger owner. The builder flagged it, the reviewer reproduced it, and one fix round removed path words from the service match.

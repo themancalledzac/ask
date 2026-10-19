@@ -11,6 +11,21 @@ from ask.store import add_repo, connect, list_repos, remove_repo, set_repo_role
 
 USAGE = 'usage: ask "<question>" | ask rbac [employee|guest] | ask add-repo|list-repos|remove-repo|update-repo'
 
+HELP = """usage: ask <command> [args]
+
+Answer where, who and status questions from repos you add, with repo:path:line citations.
+
+commands:
+  ask "<question>" [--json] [--repo NAME]   answer a question from the repos your role can see
+  ask rbac [employee|guest]                 print your role, or set it
+  ask add-repo <path> [--name N]            index a folder or git repo (employee only)
+  ask list-repos                            list the repos your role can see
+  ask remove-repo <name>                    delete a repo from the index (employee only)
+  ask update-repo <name> <employee|guest>   change which role can see a repo (employee only)
+
+Your role comes from `ask rbac`. It starts as guest.
+Exit codes: 0 answered, 1 not found, 2 refused, 3 usage or input error."""
+
 
 def _rbac(args: list[str]) -> int:
     """Print the current role, or set it when one argument is given."""
@@ -130,6 +145,9 @@ def main(argv: list[str] | None = None) -> int:
     if not args:
         print(USAGE, file=sys.stderr)
         return 3
+    if args[0] in ("--help", "-h"):
+        print(HELP)
+        return 0
     try:
         if args[0] == "rbac":
             return _rbac(args[1:])
