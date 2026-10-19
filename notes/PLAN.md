@@ -25,7 +25,6 @@
 - Every citation is `repo:path:line`. The quoted text equals the redacted text of that exact line, with whitespace trimmed.
 - A git repo indexes every `git ls-files` file, code and `.github/` included. A non-git folder indexes every text file, skipping `.git` and binaries.
 - A path that can't be read gives a one-line error that says how to fix it.
-- Held-out repo: ../mempalace at a938e3c. No builder or reviewer agent reads it, searches its mempalace wing, or runs the held-out eval. The main session runs it and passes only the score on.
 - Exit codes: 0 answered, 1 not found, 2 refused, 3 usage or input error.
 - No inline comments in code (user's global rule). Docblocks of three sentences or fewer.
 
@@ -56,9 +55,8 @@ src/ask/eval.py           eval runner
 src/ask/mcp_server.py     step 4 only
 tests/                    one test file per module, fixtures built in tmp_path
 eval/seen.jsonl           rows written by the golden subagent, checked by the user
-eval/heldout.jsonl        rows written by the user
 eval/repos.json           which repos each eval adds, with roles
-notes/SCOREBOARD.md       one row per step: seen and held-out scores
+notes/SCOREBOARD.md       one row per step: the eval score
 notes/AI-LOG.md           per step: delegated, by hand, where agents were wrong
 notes/WRITEUP.md          the brief's write-up sections (BRIEF:19-23)
 README.md                 prerequisites and one run command
@@ -296,22 +294,21 @@ DONE WHEN: `uv run pytest tests/test_codeowners.py -q` passes with rows for: las
 
 **Interfaces:**
 - Produces: `uv run python -m ask.eval eval/<rows>.jsonl [--detail]`. It builds a temp `ASK_HOME`, adds the repos named in `eval/repos.json` with their roles, sets each row's role, calls `answer()`, and prints `passed/total`. It prints per-row failures only with `--detail`.
-- `eval/repos.json` shape: `{"seen": [{"path": str, "role": str, "name": str}], "heldout": [{"path": str, "role": str, "name": str, "pin": str}]}`. Paths are relative to the repo root (the parent of `eval/`). A rows file whose name starts with `heldout` uses the `heldout` list. Any other rows file uses `seen`.
+- `eval/repos.json` shape: `{"repos": [{"path": str, "role": str, "name": str}]}`. Paths are relative to the repo root (the parent of `eval/`).
 - Row: `{"q": str, "role": "employee"|"guest", "repo": str|null, "status": str, "owners_include": [str], "path_endswith": str|null, "must_not_contain": [str]}`. Every field except `q`, `role` and `status` is optional. `path_endswith` passes when any hit or owner citation path ends with it. `must_not_contain` is a case-insensitive substring check against the full JSON text.
 - The `ask` repo tracks its own eval rows, plan and tests, so an employee search can match the row's own text. Every not-found row is therefore a guest row or sets `repo` to a repo other than `ask`. No row targets a file in `ask` other than `pyproject.toml`.
-- `eval/repos.json`: seen repos `context-bundle` (guest), `ask` (employee), `../edens.zac` (employee), `../edens.zac.backend` (guest). Held-out entry `../mempalace` (employee), pinned at `a938e3c`. The runner refuses to score held-out rows if `git -C ../mempalace rev-parse --short HEAD` is not `a938e3c`.
+- `eval/repos.json`: `context-bundle` (guest), `ask` (employee), `../edens.zac` (employee), `../edens.zac.backend` (guest), `eval/fixtures/codeowners` (employee). The held-out repo was dropped after step 1 by the user's decision.
 
-GOAL: Each step can be scored on seen and held-out rows in separate columns, and the held-out repo stays unread.
+GOAL: Each step can be scored on rows the builder did not write.
 MUST HOLD:
-- Someone other than the builder writes the test rows. A separate golden subagent writes `eval/seen.jsonl`. The user writes `eval/heldout.jsonl`. The user checks seen rows by hand before step 2.
-- No builder or reviewer agent reads ../mempalace, searches its mempalace wing, or runs the held-out eval. The main session runs it and passes only the score on.
-- The scoreboard gets one row per step, with seen and held-out scores in separate columns.
+- Someone other than the builder writes the test rows. A separate golden subagent writes `eval/seen.jsonl`. The user checks the rows by hand before step 2.
+- The scoreboard gets one row per step.
 OUT OF SCOPE: owner rows (step 2 adds them).
-DONE WHEN: `uv run pytest tests/test_eval.py -q` passes, with a row where a wrong `status` counts as a fail and a row where a tmp fixture repo with a wrong `pin` is refused. `uv run python -m ask.eval eval/seen.jsonl` prints a score. The main session runs `eval/heldout.jsonl` and writes both scores to SCOREBOARD.md row "step 1". broken-twin: make the runner treat every row as passed and confirm the wrong-status row goes red, then restore.
+DONE WHEN: `uv run pytest tests/test_eval.py -q` passes, with a row where a wrong `status` counts as a fail. `uv run python -m ask.eval eval/seen.jsonl` prints a score, and the main session writes it to SCOREBOARD.md row "step 1". broken-twin: make the runner treat every row as passed and confirm the wrong-status row goes red, then restore.
 
 - [ ] The golden subagent writes about 10 seen search rows (bundle, ask, edens.zac, edens.zac.backend), including 3 not-found and 2 guest rows, plus 3 CODEOWNERS path rows built against a tmp fixture repo it describes in `eval/fixtures/codeowners/` (a CODEOWNERS file and empty files at the named paths). It reads only those repos.
 - [ ] The builder writes the runner test, the runner and `eval/repos.json`.
-- [ ] The user checks `eval/seen.jsonl` and writes `eval/heldout.jsonl`.
+- [ ] The user checks `eval/seen.jsonl`.
 - [ ] The main session runs both and fills the scoreboard, the AI log, and the matching sections of `notes/WRITEUP.md`.
 - [ ] Commit. Open the step 1 PR. The user approves the merge.
 
@@ -366,12 +363,11 @@ broken-twin: (a) let owner questions fall back to text search and confirm the Ze
 
 **Files:** Modify `eval/seen.jsonl`, `notes/SCOREBOARD.md`, `notes/AI-LOG.md`.
 
-GOAL: The 12 questions from last week and the not-found rows are scored on seen and held-out data.
+GOAL: The 12 questions from last week and the not-found rows are scored.
 MUST HOLD:
 - Someone other than the builder writes the test rows. The user checks them by hand.
-- The held-out eval is run only by the main session.
 - A step fails on any of: a wrong answer from a source, a leaked secret, a quote not in the source, restricted content shown to a guest, or an answer where it should say not found.
-OUT OF SCOPE: tuning code to the held-out rows.
+OUT OF SCOPE: new features.
 DONE WHEN: the golden subagent has added 12 rows from `context-bundle/questions-last-week.md` plus 4 not-found rows. The user has checked them. Both evals have run and SCOREBOARD.md has a "step 2" row. Wrong answers found here become a failing test in the same session, then a fix.
 
 - [ ] The golden subagent writes the rows.
@@ -398,7 +394,7 @@ MUST HOLD:
 - The write-up's safety section says `ask rbac` is self-asserted and stands in for SSO login.
 - The repo becomes public only after the user says yes.
 OUT OF SCOPE: new features.
-DONE WHEN: in a temp folder, `git clone` then `uv run ask rbac employee`, `uv run ask add-repo context-bundle`, `uv run ask "who owns ledger?"` work with a fresh `ASK_HOME`. After the user makes the repo public, the same three commands work through the `uvx` line. WRITEUP.md has the five headings. The held-out eval is run and SCOREBOARD.md has a "step 3" row. The submission is tagged `submission`. Anything after that goes on a branch.
+DONE WHEN: in a temp folder, `git clone` then `uv run ask rbac employee`, `uv run ask add-repo context-bundle`, `uv run ask "who owns ledger?"` work with a fresh `ASK_HOME`. After the user makes the repo public, the same three commands work through the `uvx` line. WRITEUP.md has the five headings. SCOREBOARD.md has a "step 3" row. The submission is tagged `submission`. Anything after that goes on a branch.
 
 - [ ] Write the README and WRITEUP.md.
 - [ ] Run the fresh-clone test.
@@ -420,7 +416,7 @@ MUST HOLD:
 - The tool's parameters are `question` and optional `repo` (a repo name or an absolute path). The role is read with `get_role()` on each call and is never a parameter. The tool returns the result dict.
 - MCP is the one dependency exception, as an optional extra.
 OUT OF SCOPE: any other tool.
-DONE WHEN: `uv run --extra mcp pytest tests/test_mcp.py -q` passes. It checks that the tool list is exactly `["ask"]`, that the schema has no role field, and that a guest call with `repo` naming an employee repo returns the refusal. The main session runs the held-out eval and adds a "step 4" row. broken-twin: add a `role` parameter and confirm the schema row goes red, then restore.
+DONE WHEN: `uv run --extra mcp pytest tests/test_mcp.py -q` passes. It checks that the tool list is exactly `["ask"]`, that the schema has no role field, and that a guest call with `repo` naming an employee repo returns the refusal. The main session adds a "step 4" scoreboard row. broken-twin: add a `role` parameter and confirm the schema row goes red, then restore.
 
 ---
 
@@ -432,7 +428,7 @@ DONE WHEN: `uv run --extra mcp pytest tests/test_mcp.py -q` passes. It checks th
 | Risk 1: git and non-git indexing, `.github/` | 2 |
 | Risk 1: one-line error | 3 |
 | Risk 1: citation is the exact line | 4, 7 |
-| Risk 1: held-out column, CODEOWNERS fixture (step 1) | 5, 6 |
+| Risk 1: CODEOWNERS fixture (step 1) | 5, 6 |
 | Risk 2: roles, update-repo, default employee | 1, 3 |
 | Risk 2: rbac in config, never from the question or an agent | 1, 4, 10 |
 | Risk 2: exact not-found and refusal text | 3, 4, 7 |
@@ -447,12 +443,12 @@ DONE WHEN: `uv run --extra mcp pytest tests/test_mcp.py -q` passes. It checks th
 | Data sources: CODEOWNERS rules | 5 |
 | Data sources: services.json rules | 7 |
 | Data sources: Devanagari row | 4 |
-| Data sources: test repos, mempalace pin | 6 |
+| Data sources: test repos | 6 |
 | Steps 1 to 4, cut line | Steps 1 to 4 |
 | Brief trace: fresh clone (BRIEF:3, 17) | 9 |
 | Brief trace: time log (BRIEF:4) | each step's SCOREBOARD row |
 | Brief trace: write-up sections (BRIEF:19-23), updated each step | 6, 8, 9 |
-| Held-out scored every step | 6, 8, 9, 10 |
+| Scored every step | 6, 8, 9, 10 |
 | Build rules: one PR per step, AI log, broken twins | every step |
 
 Not in the spec, added by this plan:

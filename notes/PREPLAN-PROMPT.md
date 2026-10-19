@@ -18,7 +18,7 @@ Rules:
 - A path that can't be read gives a one-line error that says how to fix it.
 - Every citation is `repo:path:line`. The quoted text appears on that exact line.
 
-Test in step 1: the held-out mempalace column, using my rows, and a CODEOWNERS fixture repo. No seen repo has a CODEOWNERS file.
+Test in step 1: a CODEOWNERS fixture repo, since no seen repo has a CODEOWNERS file, and `add-repo` on the real seen repos.
 
 ### 2. Access and exposure (BRIEF:22)
 
@@ -64,11 +64,11 @@ Decided for you, change any:
   - A word in a service's description ("billing" → ledger) counts as a match only when it names exactly one service.
 - Git repos. Reference: `git ls-files` docs. Ignored files are never indexed.
 - Text. Reference: SQLite FTS5 docs (unicode61, bm25()). Test row: the Devanagari "Aperture" at services-overview.md:1 doesn't match "Aperture".
-- Test repos. Seen: context-bundle, this repo, ../edens.zac (651372d5), ../edens.zac.backend (417e36f9). Held out: ../mempalace at a938e3c. No agent reads it or searches its mempalace wing. I write its rows, and it is scored in its own column at every step.
+- Test repos. Seen: context-bundle, this repo, ../edens.zac (651372d5), ../edens.zac.backend (417e36f9). There is no held-out repo. I dropped it after step 1.
 
 ## Steps
 
-1. Repos, index, access, search (~40m): `add-repo`, `list-repos`, `remove-repo`, `update-repo`, `rbac`, and `ask "<question>"` with `--json` and `--repo`. Also git and non-git indexing, redaction, the not-found rule, and the planted-word and secret fixtures. Score the seen repos and the mempalace column.
+1. Repos, index, access, search (~40m): `add-repo`, `list-repos`, `remove-repo`, `update-repo`, `rbac`, and `ask "<question>"` with `--json` and `--repo`. Also git and non-git indexing, redaction, the not-found rule, and the planted-word and secret fixtures. Score the seen rows.
 2. Owners and the bundle (~20m): services.json and CODEOWNERS lookup, recent committers, the 12 questions and the not-found rows. The cut line is at minute 65. If I'm behind, I ship what step 2 has.
 3. Ship (~15m): README with prerequisites and one run command (`uvx --from git+https://github.com/themancalledzac/ask ask`), a fresh-clone test in a temp folder, make the repo public, write-up.
 4. Stretch: an MCP server exposing `ask`, with the role read from config.
@@ -84,8 +84,8 @@ Decided for you, change any:
 | 15 taste in scoping | the write-up's "left out" list | a listed feature that got built, or a built one not listed |
 | 19–23 write-up sections | a check that the write-up has these headings | a missing section |
 | 22 safety / access | the planted-word and secret fixtures | `zorbquill` in guest output, or a secret in any output |
-| 25 one thing genuinely end-to-end | the mempalace column | an owner or citation wrong on the held-out repo |
-| 27 their own repo | `add-repo` on mempalace and the CODEOWNERS fixture | any held-out row failing, or a fixture's last-match row failing |
+| 25 one thing genuinely end-to-end | the 12 bundle questions run by hand | a real answer that comes back not found or from the wrong file |
+| 27 their own repo | `add-repo` on the seen repos and the CODEOWNERS fixture | a fixture's last-match row failing |
 
 ## Build rules that apply
 
@@ -97,7 +97,7 @@ Decided for you, change any:
 - Someone other than the builder writes the test rows. I check them by hand before step 2.
 - A step fails on any of: a wrong answer from a source, a leaked secret, a quote not in the source, restricted content shown to a guest, or an answer where it should say not found.
 - Every fail rule gets a broken-twin check.
-- The scoreboard gets one row per step, with seen and held-out scores in separate columns.
+- The scoreboard gets one row per step.
 - A problem a review finds becomes a failing test in the same session, then a fix.
 - Docs and docblocks only claim what a test proves.
 - One branch and PR per step. I approve each merge. If I skip a check, the write-up doesn't claim it.

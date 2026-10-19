@@ -5,7 +5,7 @@ Tools: Claude Code (Opus as controller, Sonnet for builders and reviewers, Haiku
 ## Planning (before the clock)
 
 - Delegated: a fresh agent read the plan and listed what it would have to guess. It found 30-odd gaps, including PEM keys spanning lines, `sk-` matching inside "risk-management", `docs/*` matching nested files, and services.json field names that didn't match the file.
-- By hand: the ranking of risks, the five access and correctness rules, and the choice of held-out repo.
+- By hand: the ranking of risks, and the five access and correctness rules.
 - Where the agent was wrong: the mempalace search pulled up notes from an unrelated project. I dropped them, and builders get no mempalace access.
 
 ## Step 1
