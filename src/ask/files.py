@@ -4,16 +4,24 @@ import os
 import subprocess
 from pathlib import Path
 
+from ask.model import AskError
+
 MAX_BYTES = 1_048_576
 SNIFF_BYTES = 8192
 
 
 def _is_git_root(root: Path) -> bool:
-    result = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-    )
+    """True when the folder is the top of a git work tree. Without git installed, a folder holding `.git` raises AskError and any other folder is not a git root."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as e:
+        if (root / ".git").exists():
+            raise AskError(f"Cannot run git to read {root}: {e.strerror or e}. Install git and try again.") from e
+        return False
     return result.returncode == 0 and Path(result.stdout.strip()).resolve() == root.resolve()
 
 
@@ -36,7 +44,7 @@ def list_files(root: Path) -> list[Path]:
         out = subprocess.run(
             ["git", "-C", str(root), "ls-files", "-z"], capture_output=True, check=True
         ).stdout
-        names = [os.fsdecode(n) for n in out.split(b"\0") if n]
+        names = [os.fsdecode(n) for n in dict.fromkeys(out.split(b"\0")) if n]
         return sorted(p for p in map(Path, filter(_utf8, names)) if _wanted(root, p))
     found = []
     for dirpath, dirnames, filenames in os.walk(root):

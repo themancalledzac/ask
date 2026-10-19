@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from ask.cli import main
 from ask.files import list_files, read_text_lines
 from ask.store import add_repo, connect
 
@@ -189,3 +190,42 @@ def test_surrogate_name_from_the_walk_is_dropped(tmp_path, monkeypatch):
     monkeypatch.setattr("ask.files.os.walk", lambda root: [(str(root), [], ["good.md", bad])])
     monkeypatch.setattr("ask.files._wanted", lambda root, rel: True)
     assert list_files(tmp_path) == [Path("good.md")]
+
+
+def test_conflicted_file_is_listed_once(tmp_path):
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    write(tmp_path, "m.txt", "base\n")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-q", "-m", "base")
+    git(tmp_path, "checkout", "-q", "-b", "other")
+    write(tmp_path, "m.txt", "other\n")
+    git(tmp_path, "commit", "-q", "-am", "other")
+    git(tmp_path, "checkout", "-q", "main")
+    write(tmp_path, "m.txt", "main\n")
+    git(tmp_path, "commit", "-q", "-am", "main")
+    subprocess.run(["git", "merge", "-q", "other"], cwd=tmp_path, capture_output=True)
+    assert list_files(tmp_path) == [Path("m.txt")]
+
+
+def no_git(*args, **kwargs):
+    raise FileNotFoundError(2, "No such file or directory", "git")
+
+
+def test_plain_folder_indexes_without_git(ask_home, tmp_path, monkeypatch):
+    root = tmp_path / "plain"
+    write(root, "a.md", "hello\n")
+    monkeypatch.setattr("ask.files.subprocess.run", no_git)
+    assert add_repo(connect(), root).file_count == 1
+
+
+def test_git_repo_without_git_installed_says_so(ask_home, tmp_path, monkeypatch, capsys):
+    root = tmp_path / "repo"
+    write(root, "a.md", "hello\n")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    main(["rbac", "employee"])
+    capsys.readouterr()
+    monkeypatch.setattr("ask.files.subprocess.run", no_git)
+    assert main(["add-repo", str(root)]) == 3
+    err = capsys.readouterr().err
+    assert len(err.strip().splitlines()) == 1
+    assert "install git" in err.lower()

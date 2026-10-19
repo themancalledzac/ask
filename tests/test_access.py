@@ -1,3 +1,7 @@
+import os
+
+import pytest
+
 from ask.access import can_see, get_role
 from ask.cli import main
 
@@ -54,3 +58,26 @@ def test_can_see_pairs():
     assert can_see("guest", "guest") is True
     assert can_see("employee", "employee") is True
     assert can_see("employee", "guest") is True
+
+
+def test_config_with_bad_utf8_reads_as_guest(ask_home):
+    ask_home.mkdir()
+    (ask_home / "config.toml").write_bytes(b'role = "\xff"\n')
+    assert get_role() == "guest"
+
+
+def test_config_that_is_a_directory_reads_as_guest(ask_home):
+    (ask_home / "config.toml").mkdir(parents=True)
+    assert get_role() == "guest"
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores mode 000")
+def test_unreadable_config_reads_as_guest(ask_home):
+    ask_home.mkdir()
+    config = ask_home / "config.toml"
+    config.write_text('role = "employee"\n')
+    config.chmod(0)
+    try:
+        assert get_role() == "guest"
+    finally:
+        config.chmod(0o644)
