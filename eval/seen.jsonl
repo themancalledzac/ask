@@ -1,0 +1,13 @@
+{"q": "what is the on-call rotation schedule?", "role": "guest", "repo": null, "status": "answered", "path_endswith": "docs/oncall.md", "owners_include": [], "must_not_contain": []}
+{"q": "who approves production deploys in the forge dashboard?", "role": "guest", "repo": null, "status": "answered", "path_endswith": "docs/deploy-pipeline.md", "owners_include": [], "must_not_contain": []}
+{"q": "why is error tracking cloudwatch and not sentry?", "role": "employee", "repo": "edens.zac", "status": "answered", "path_endswith": "docs/decisions.md", "owners_include": [], "must_not_contain": []}
+{"q": "does the database survive backend deploys?", "role": "guest", "repo": null, "status": "answered", "path_endswith": "ai_docs/ai_deployment_strategy.md", "owners_include": [], "must_not_contain": []}
+{"q": "what python version does ask require?", "role": "employee", "repo": "ask", "status": "answered", "path_endswith": "pyproject.toml", "owners_include": [], "must_not_contain": []}
+{"q": "kubernetes helm chart", "role": "guest", "repo": null, "status": "not_found", "owners_include": [], "path_endswith": null, "must_not_contain": []}
+{"q": "kafka consumer lag dashboard", "role": "guest", "repo": null, "status": "not_found", "owners_include": [], "path_endswith": null, "must_not_contain": []}
+{"q": "stripe payment webhook", "role": "employee", "repo": "edens.zac", "status": "not_found", "owners_include": [], "path_endswith": null, "must_not_contain": []}
+{"q": "does www redirect to the apex domain?", "role": "guest", "repo": null, "status": "not_found", "must_not_contain": ["edens.zac", "301s"], "owners_include": [], "path_endswith": null}
+{"q": "what is the production host?", "role": "guest", "repo": "edens.zac", "status": "refused", "owners_include": [], "path_endswith": null, "must_not_contain": []}
+{"q": "who owns services/billing/api.py?", "role": "employee", "repo": "codeowners-fixture", "status": "answered", "owners_include": ["@fixture-ana"], "must_not_contain": ["@fixture/billing"], "path_endswith": null}
+{"q": "who owns services/web/page.html?", "role": "employee", "repo": "codeowners-fixture", "status": "answered", "owners_include": ["@fixture/platform"], "must_not_contain": ["@fixture/web"], "path_endswith": null}
+{"q": "who owns services/billing/README.md?", "role": "employee", "repo": "codeowners-fixture", "status": "answered", "owners_include": ["@fixture/billing", "@fixture-ben"], "must_not_contain": ["@fixture/docs"], "path_endswith": null}

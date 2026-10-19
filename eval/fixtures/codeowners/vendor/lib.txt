@@ -1,0 +1,1 @@
+Vendored library placeholder for the fixture.
