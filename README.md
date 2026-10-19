@@ -70,7 +70,7 @@ To let guests see the bundle, an employee runs `ask update-repo context-bundle g
 | Command | What it does |
 | --- | --- |
 | `ask "<question>"` | Answer from the repos your role can see. |
-| `ask "<question>" --json` | The same answer as JSON: status, kind, message, owners, hits and recent committers. |
+| `ask "<question>" --json` | The same answer as JSON: status, kind, message, owners, hits, recent committers and repo info. |
 | `ask "<question>" --repo NAME` | Search only that repo. |
 | `ask rbac` | Print your role. It starts as guest. |
 | `ask rbac employee` or `ask rbac guest` | Set your role. |
@@ -79,6 +79,8 @@ To let guests see the bundle, an employee runs `ask update-repo context-bundle g
 | `ask remove-repo <name>` | Delete a repo from the index. Employee only. |
 | `ask update-repo <name> <employee\|guest>` | Change which role can see a repo. Employee only. |
 | `ask --help` | Print usage. |
+
+An owner question about a repo with no CODEOWNERS file, named by `--repo`, by its name or by a path in it, says `No CODEOWNERS file in <repo>, so no owner is recorded.` and exits 1. It also prints the GitHub org parsed from the `origin` remote and the top recent committers, both labelled as not owners. In `--json` they are under `repo_info`, and `owners` stays empty. Only the host, org and repo name of the remote are shown, never the URL or any user or token in it.
 
 Exit codes:
 

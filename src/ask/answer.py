@@ -15,6 +15,7 @@ from ask.owners import (
     owners_for_path,
     parse_codeowners,
     recent_committers,
+    remote_info,
     resolve_service,
 )
 from ask.redact import redact_lines
@@ -33,6 +34,7 @@ def _result(status: str, kind: str | None, message: str, hits: list[Citation] | 
         "owners": [],
         "hits": [asdict(h) for h in hits or []],
         "recent_committers": [],
+        "repo_info": [],
     }
 
 
@@ -146,14 +148,44 @@ def _path_owners(con: sqlite3.Connection, tokens: list[str], visible: list[Repo]
     return labels, owners, committers
 
 
-def _owners(con: sqlite3.Connection, question: str, visible: list[Repo]) -> dict:
-    """Owners from services.json and CODEOWNERS in visible repos only. Path tokens are matched against CODEOWNERS and never against service names. Never falls back to text search."""
+def _targets(con: sqlite3.Connection, question: str, tokens: list[str], visible: list[Repo], target: Repo | None) -> dict[str, list[str]]:
+    """Visible repos the question targets by --repo, by name or by an indexed path, each with the paths it matched."""
+    words = {raw.lower().rstrip(TRAILING_PUNCTUATION) for raw in question.split()}
+    out: dict[str, list[str]] = {}
+    for repo in visible:
+        paths = [path for _, path in _match_paths(con, repo, tokens)]
+        if paths or (target is not None and repo.name == target.name) or repo.name.lower() in words:
+            out[repo.name] = paths
+    return out
+
+
+def _no_codeowners(con: sqlite3.Connection, question: str, tokens: list[str], visible: list[Repo], target: Repo | None) -> dict | None:
+    """The answer for targeted repos that have no CODEOWNERS file, or None when there are none. The org and committers are context, never owners."""
+    targets = _targets(con, question, tokens, visible, target)
+    bare = [r for r in visible if r.name in targets and find_codeowners(Path(r.path)) is None]
+    if not bare:
+        return None
+    message = " ".join(f"No CODEOWNERS file in {r.name}, so no owner is recorded." for r in bare)
+    result = _result("not_found", "owner", message)
+    result["repo_info"] = [
+        {
+            "repo": r.name,
+            "remote": remote_info(Path(r.path)),
+            "recent_committers": recent_committers(Path(r.path), targets[r.name]),
+        }
+        for r in bare
+    ]
+    return result
+
+
+def _owners(con: sqlite3.Connection, question: str, visible: list[Repo], target: Repo | None = None) -> dict:
+    """Owners from services.json and CODEOWNERS in visible repos only. Path tokens are matched against CODEOWNERS and never against service names. With no owner, a targeted repo with no CODEOWNERS file is named as such, and nothing falls back to text search."""
     rest, tokens = _split_paths(question)
     service_labels, service_owners = _service_owners(rest, visible)
     path_labels, path_owners, committers = _path_owners(con, tokens, visible)
     owners = service_owners + path_owners
     if not owners:
-        return _result("not_found", None, NOT_FOUND)
+        return _no_codeowners(con, question, tokens, visible, target) or _result("not_found", None, NOT_FOUND)
     result = _result("answered", "owner", f"Owner of {', '.join(service_labels + path_labels)}:")
     result["owners"] = owners
     result["recent_committers"] = [{"name": n, "commits": c} for n, c in committers.most_common(3)]
@@ -168,6 +200,7 @@ def is_owner_question(question: str) -> bool:
 def answer(con: sqlite3.Connection, question: str, role: str, repo: str | None = None) -> dict:
     """Answer a question for a caller with the given role. A named repo the role cannot see is refused; an unknown one is not found."""
     repos = list_repos(con)
+    target = None
     if repo is not None:
         target = _resolve_repo(repos, repo)
         if target is None:
@@ -177,5 +210,5 @@ def answer(con: sqlite3.Connection, question: str, role: str, repo: str | None =
         repos = [target]
     visible = [r for r in repos if can_see(role, r.role)]
     if is_owner_question(question):
-        return _owners(con, question, visible)
+        return _owners(con, question, visible, target)
     return _search(con, question, visible)
