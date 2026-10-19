@@ -1,0 +1,6 @@
+* @fixture/platform
+*.md @fixture/docs
+/web/ @fixture/web
+/services/billing/ @fixture/billing @fixture-ben
+/services/billing/api.py @fixture-ana
+/vendor/
