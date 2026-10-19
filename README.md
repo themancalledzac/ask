@@ -4,6 +4,8 @@
 
 The write-up for the take-home is in [notes/WRITEUP.md](notes/WRITEUP.md).
 
+The build was tracked on a Task Dashboard: [Ask Take-home Dashboard](https://claude.ai/artifact/UnPNMwDQ9T6j9wEbSejXdH). It shows the goals, every step with its T+ minute, and the clock, which ended at T+92.
+
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/)
