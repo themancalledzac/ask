@@ -2,7 +2,11 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
+from ask.cli import main
 from ask.files import list_files, read_text_lines
+from ask.store import add_repo, connect
 
 
 def git(root, *args):
@@ -136,3 +140,92 @@ def test_nul_in_first_8k_is_none_but_later_is_not(tmp_path):
 def test_invalid_utf8_is_none(tmp_path):
     p = write(tmp_path, "bad.txt", b"\xff\xfe abc")
     assert read_text_lines(p) is None
+
+
+def make_latin1_name(root):
+    bad = os.path.join(os.fsencode(root), b"caf\xe9.md")
+    try:
+        with open(bad, "wb") as f:
+            f.write(b"menu\n")
+    except OSError:
+        pytest.skip("filesystem refuses non-UTF-8 file names")
+
+
+def test_non_utf8_file_name_is_skipped_in_a_folder(ask_home, tmp_path):
+    root = tmp_path / "r"
+    write(root, "good.md", "good line\n")
+    make_latin1_name(root)
+    assert list_files(root) == [Path("good.md")]
+    assert add_repo(connect(), root).file_count == 1
+
+
+def test_non_utf8_file_name_is_skipped_in_git(ask_home, tmp_path):
+    root = tmp_path / "g"
+    write(root, "good.md", "good line\n")
+    make_latin1_name(root)
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    git(root, "add", ".")
+    git(root, "commit", "-q", "-m", "init")
+    assert list_files(root) == [Path("good.md")]
+    assert add_repo(connect(), root).file_count == 1
+
+
+def test_file_over_one_megabyte_is_never_read(tmp_path, monkeypatch):
+    big = tmp_path / "big.txt"
+    big.touch()
+    os.truncate(big, 2 * 1_048_576)
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("read a file over 1 MB")
+
+    monkeypatch.setattr(Path, "read_bytes", refuse)
+    monkeypatch.setattr(Path, "open", refuse)
+    monkeypatch.setattr("builtins.open", refuse)
+    assert read_text_lines(big) is None
+
+
+def test_surrogate_name_from_the_walk_is_dropped(tmp_path, monkeypatch):
+    bad = os.fsdecode(b"caf\xe9.md")
+    monkeypatch.setattr("ask.files._is_git_root", lambda root: False)
+    monkeypatch.setattr("ask.files.os.walk", lambda root: [(str(root), [], ["good.md", bad])])
+    monkeypatch.setattr("ask.files._wanted", lambda root, rel: True)
+    assert list_files(tmp_path) == [Path("good.md")]
+
+
+def test_conflicted_file_is_listed_once(tmp_path):
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    write(tmp_path, "m.txt", "base\n")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-q", "-m", "base")
+    git(tmp_path, "checkout", "-q", "-b", "other")
+    write(tmp_path, "m.txt", "other\n")
+    git(tmp_path, "commit", "-q", "-am", "other")
+    git(tmp_path, "checkout", "-q", "main")
+    write(tmp_path, "m.txt", "main\n")
+    git(tmp_path, "commit", "-q", "-am", "main")
+    subprocess.run(["git", "merge", "-q", "other"], cwd=tmp_path, capture_output=True)
+    assert list_files(tmp_path) == [Path("m.txt")]
+
+
+def no_git(*args, **kwargs):
+    raise FileNotFoundError(2, "No such file or directory", "git")
+
+
+def test_plain_folder_indexes_without_git(ask_home, tmp_path, monkeypatch):
+    root = tmp_path / "plain"
+    write(root, "a.md", "hello\n")
+    monkeypatch.setattr("ask.files.subprocess.run", no_git)
+    assert add_repo(connect(), root).file_count == 1
+
+
+def test_git_repo_without_git_installed_says_so(ask_home, tmp_path, monkeypatch, capsys):
+    root = tmp_path / "repo"
+    write(root, "a.md", "hello\n")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    main(["rbac", "employee"])
+    capsys.readouterr()
+    monkeypatch.setattr("ask.files.subprocess.run", no_git)
+    assert main(["add-repo", str(root)]) == 3
+    err = capsys.readouterr().err
+    assert len(err.strip().splitlines()) == 1
+    assert "install git" in err.lower()

@@ -198,7 +198,7 @@ def test_json_output_is_the_result_dict(two_repos, capsys):
     assert main(["zorbquill", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["status"] == "answered" and data["kind"] == "search"
-    assert set(data) == {"status", "kind", "message", "owners", "hits", "recent_committers"}
+    assert set(data) == {"status", "kind", "message", "owners", "hits", "recent_committers", "repo_info"}
     assert set(data["hits"][0]) == {"repo", "path", "line", "quote"}
     check_quotes(two_repos, data)
     check_quotes(two_repos, answer(two_repos, "zorbquill", "employee"))

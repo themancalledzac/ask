@@ -4,9 +4,10 @@ from pathlib import Path
 
 import pytest
 
+from ask.answer import answer
 from ask.cli import main
 from ask.model import AskError
-from ask.store import add_repo, connect, list_repos, remove_repo, set_repo_role
+from ask.store import SCHEMA_VERSION, add_repo, connect, list_repos, remove_repo, set_repo_role
 
 SECRET = "AKIAABCDEFGHIJKLMNOP"
 
@@ -214,8 +215,45 @@ def test_set_role_rejects_unknown(ask_home, repo):
         set_repo_role(con, "shop", "boss")
 
 
-def test_schema_is_fts5_with_porter(ask_home):
+def test_schema_is_fts5_unicode61_without_porter(ask_home):
     con = connect()
     sql = con.execute("SELECT sql FROM sqlite_master WHERE name = 'chunks'").fetchone()[0]
-    assert "porter unicode61" in sql
-    assert isinstance(con, sqlite3.Connection)
+    assert "unicode61" in sql
+    assert "porter" not in sql
+    assert con.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+
+
+OLD_SCHEMA = """
+CREATE TABLE repos(name TEXT PRIMARY KEY, path TEXT, role TEXT DEFAULT 'employee', file_count INTEGER);
+CREATE VIRTUAL TABLE chunks USING fts5(
+    text, repo UNINDEXED, path UNINDEXED, start_line UNINDEXED, tokenize='porter unicode61'
+);
+"""
+
+
+def test_old_index_is_rebuilt_keeping_names_and_roles(ask_home, tmp_path, capsys):
+    kept = make_repo(tmp_path / "kept-folder", {"a.md": "the deployment guide lives here\n"})
+    ask_home.mkdir()
+    old = sqlite3.connect(ask_home / "index.db")
+    old.executescript(OLD_SCHEMA)
+    old.executemany(
+        "INSERT INTO repos VALUES (?, ?, ?, ?)",
+        [("kept", str(kept.resolve()), "guest", 9), ("lost", str(tmp_path / "gone"), "employee", 4)],
+    )
+    old.execute("INSERT INTO chunks VALUES ('stale text', 'kept', 'old.md', 1)")
+    old.commit()
+    old.close()
+    con = connect()
+    sql = con.execute("SELECT sql FROM sqlite_master WHERE name = 'chunks'").fetchone()[0]
+    assert "porter" not in sql
+    assert [(r.name, r.role, r.file_count) for r in list_repos(con)] == [("kept", "guest", 1), ("lost", "employee", 0)]
+    assert con.execute("SELECT repo, path, text FROM chunks").fetchall() == [
+        ("kept", "a.md", "the deployment guide lives here")
+    ]
+    err = capsys.readouterr().err
+    assert len(err.strip().splitlines()) == 1
+    assert "lost" in err
+    assert answer(con, "deploy", "guest")["status"] == "answered"
+    con.close()
+    connect()
+    assert capsys.readouterr().err == ""

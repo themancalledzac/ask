@@ -4,7 +4,7 @@
 
 **Goal:** A Python CLI, `ask`, that answers where X lives, who owns X, and its status from repos the user adds, with a file-and-line citation on every answer and two access roles.
 
-**Architecture:** `ask add-repo` walks a folder (`git ls-files`, or a text-file walk for non-git folders), redacts secrets, and writes line-numbered chunks into one SQLite FTS5 table in `$ASK_HOME/index.db`. A question goes to one of two paths. An owner question resolves through services.json or CODEOWNERS only. Any other question runs an all-words FTS5 match with one fallback. Every path filters repos by the caller's role from `$ASK_HOME/config.toml` before it reads a row.
+**Architecture:** `ask add-repo` walks a folder (`git ls-files`, or a text-file walk for non-git folders), redacts secrets, and writes line-numbered chunks into one SQLite FTS5 table in `$ASK_HOME/index.db`. A question goes to one of two paths. An owner question resolves through services.json or CODEOWNERS only. Any other question runs an FTS5 match and keeps chunks that cover 60% of its content words (all of them, up to two). Every path filters repos by the caller's role from `$ASK_HOME/config.toml` before it reads a row.
 
 **Tech Stack:** Python 3.11+ standard library (`sqlite3` with FTS5, `tomllib`, `argparse`, `subprocess`), uv, pytest (dev only). Optional extra `mcp` for step 4.
 
@@ -181,7 +181,7 @@ broken-twin: drop the URL-password pattern and confirm its row goes red, then re
 - Consumes: `ask_home`, `get_role`, `can_see`, `list_files`, `read_text_lines`, `redact`.
 - Produces: `connect() -> sqlite3.Connection` (opens `$ASK_HOME/index.db` and creates the schema). `add_repo(con, path: Path, name: str | None = None) -> Repo`. `remove_repo(con, name) -> None`. `set_repo_role(con, name, role) -> None`. `list_repos(con) -> list[Repo]`. `Repo(name, path, role, file_count)`.
 - Schema: `repos(name TEXT PRIMARY KEY, path TEXT, role TEXT DEFAULT 'employee', file_count INTEGER)`. `file_count` counts files that were read as text.
-- The default name is the basename of the resolved path, so `.` and a trailing slash both work. Re-adding the same path replaces its chunks and keeps its role. Adding a different path under a name already in use is an `AskError` that says to pass `--name`. `chunks` is an FTS5 table with `tokenize='porter unicode61'`, columns `text`, plus UNINDEXED `repo`, `path`, `start_line`. A chunk is a run of non-blank lines split at blank lines, at most 20 lines. `text` holds the redacted lines joined with `\n`.
+- The default name is the basename of the resolved path, so `.` and a trailing slash both work. Re-adding the same path replaces its chunks and keeps its role. Adding a different path under a name already in use is an `AskError` that says to pass `--name`. `chunks` is an FTS5 table with `tokenize='unicode61'` (porter was dropped in the fix wave because it broke prefix matching), columns `text`, plus UNINDEXED `repo`, `path`, `start_line`. A chunk is a run of non-blank lines split at blank lines, at most 20 lines. `text` holds the redacted lines joined with `\n`.
 - CLI: `ask add-repo <path> [--name N]`, `ask list-repos`, `ask remove-repo <name>`, `ask update-repo <name> <employee|guest>`.
 
 GOAL: The user can add, list, re-add, retag and remove repos. The index holds only redacted text.
@@ -455,7 +455,7 @@ Not in the spec, added by this plan:
 - Step 0 (a base commit, because main has none).
 - The caller defaults to `guest` when no role is set.
 - Admin commands need the employee role.
-- The porter tokenizer wraps unicode61.
+- The tokenizer is plain unicode61. Prefix matching is done in Python, and `PRAGMA user_version` triggers a rebuild of an older index.
 - The match rule was loosened after step 1's run on the bundle questions, with the user's approval (see Global Constraints).
 
 The user should confirm these five. No dead code: the repo has no source files yet.

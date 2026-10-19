@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from ask.model import ROLES, AskError
 from ask.redact import redact_lines
 
 MAX_CHUNK_LINES = 20
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS repos(
@@ -21,7 +23,7 @@ CREATE TABLE IF NOT EXISTS repos(
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
     text, repo UNINDEXED, path UNINDEXED, start_line UNINDEXED,
-    tokenize='porter unicode61'
+    tokenize='unicode61'
 );
 """
 
@@ -35,10 +37,26 @@ class Repo:
 
 
 def connect() -> sqlite3.Connection:
-    """Open $ASK_HOME/index.db and create the schema if it is missing."""
+    """Open $ASK_HOME/index.db and create the schema if it is missing. An index from an older schema version is rebuilt from each repo's folder."""
     con = sqlite3.connect(ask_home() / "index.db")
-    con.executescript(SCHEMA)
+    if con.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
+        _rebuild(con)
     return con
+
+
+def _rebuild(con: sqlite3.Connection) -> None:
+    """Recreate the chunk table and re-index every registered repo, keeping its name and role. A repo whose folder cannot be read stays registered with no chunks, and one line goes to stderr."""
+    with con:
+        con.execute("DROP TABLE IF EXISTS chunks")
+        con.executescript(SCHEMA)
+    for name, path in con.execute("SELECT name, path FROM repos ORDER BY name").fetchall():
+        try:
+            add_repo(con, Path(path), name)
+        except AskError as e:
+            with con:
+                con.execute("UPDATE repos SET file_count = 0 WHERE name = ?", (name,))
+            print(f"Could not re-index {name}: {e}", file=sys.stderr)
+    con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
 def _chunks(lines: list[str]) -> list[tuple[int, str]]:

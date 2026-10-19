@@ -261,7 +261,7 @@ def test_recent_committers_needs_git_root(tmp_path):
     assert recent_committers(inner, "a.txt") == []
 
 
-def test_owner_line_that_does_not_quote_the_owner_is_skipped(ask_home, tmp_path):
+def test_owner_listed_before_name_cites_its_own_line(ask_home, tmp_path):
     root = tmp_path / "odd"
     root.mkdir()
     (root / "services.json").write_text(
@@ -269,5 +269,52 @@ def test_owner_line_that_does_not_quote_the_owner_is_skipped(ask_home, tmp_path)
     )
     con = connect()
     add_repo(con, root, "odd")
-    assert answer(con, "who owns alpha?", "employee")["status"] == "not_found"
+    result = answer(con, "who owns alpha?", "employee")
+    assert owner_names(result) == ["Al First"]
+    assert result["owners"][0]["citation"]["line"] == 2
     assert owner_names(answer(con, "who owns beta?", "employee")) == ["Bo Two"]
+
+
+ORDER_MIX = """{"services": [
+  {
+    "owner": "Priya Nadkarni",
+    "name": "alpha"
+  },
+  {
+    "name": "beta",
+    "owner": "Priya Nadkarni"
+  },
+  {
+    "owner": "Ann Lee",
+    "name": "gamma"
+  },
+  {
+    "name": "delta",
+    "owner": "Marcus Webb"
+  },
+  {
+    "name": "epsilon",
+    "team": "E"
+  },
+  {
+    "owner": "Anna Lee",
+    "name": "zeta"
+  }
+]}
+"""
+
+
+def test_owner_line_stays_inside_its_own_service(ask_home, tmp_path):
+    root = tmp_path / "mix"
+    root.mkdir()
+    (root / "services.json").write_text(ORDER_MIX)
+    lines = {s.name: s.owner_line for s in load_services(root)}
+    assert lines == {"alpha": 3, "beta": 8, "gamma": 11, "delta": 16, "epsilon": 0, "zeta": 23}
+    con = connect()
+    add_repo(con, root, "mix")
+    for name, owner, line in (("alpha", "Priya Nadkarni", 3), ("gamma", "Ann Lee", 11), ("zeta", "Anna Lee", 23)):
+        result = answer(con, f"who owns {name}?", "employee")
+        assert owner_names(result) == [owner]
+        assert result["owners"][0]["citation"]["line"] == line
+        check_quotes(con, result)
+    assert answer(con, "who owns epsilon?", "employee")["status"] == "not_found"

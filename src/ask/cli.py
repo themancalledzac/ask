@@ -136,6 +136,14 @@ def _ask(args: list[str]) -> int:
         if result["recent_committers"]:
             names = ", ".join(f"{c['name']} ({c['commits']})" for c in result["recent_committers"])
             print(f"Recent committers, not owners: {names}")
+        several = len(result["repo_info"]) > 1
+        for info in result["repo_info"]:
+            prefix = f"{info['repo']}: " if several else ""
+            if info["remote"]:
+                print(f"{prefix}GitHub org (not an owner): {info['remote']['org']} on {info['remote']['host']}")
+            if info["recent_committers"]:
+                names = ", ".join(f"{c['name']} ({c['commits']})" for c in info["recent_committers"])
+                print(f"{prefix}Recent committers, not owners: {names}")
     return EXIT_CODES[result["status"]]
 
 

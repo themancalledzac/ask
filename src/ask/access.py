@@ -12,7 +12,7 @@ def get_role() -> str:
     try:
         with path.open("rb") as f:
             role = tomllib.load(f).get("role")
-    except (FileNotFoundError, tomllib.TOMLDecodeError):
+    except (OSError, ValueError):
         return "guest"
     return role if role in ROLES else "guest"
 
