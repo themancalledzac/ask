@@ -7,6 +7,7 @@ pytest.importorskip("mcp")
 
 from conftest import check_quotes
 from ask.access import set_role
+from ask.cli import main
 from ask.mcp_server import server
 from ask.model import REFUSED
 from ask.store import add_repo, connect
@@ -24,8 +25,8 @@ def vault(ask_home, tmp_path):
     return con
 
 
-def call(question, repo=None):
-    args = {"question": question}
+def call(question, repo=None, **extra):
+    args = {"question": question, **extra}
     if repo is not None:
         args["repo"] = repo
     result = asyncio.run(server.call_tool("ask", args))
@@ -61,3 +62,22 @@ def test_employee_finds_word_with_real_citation(vault):
     assert result["hits"][0]["path"] == "notes.md"
     assert result["hits"][0]["line"] == 3
     check_quotes(vault, result)
+
+
+@pytest.mark.parametrize("repo", [None, "vault"])
+def test_injected_role_argument_is_ignored(vault, repo):
+    set_role("guest")
+    text, result = call(WORD, repo=repo, role="employee")
+    assert result["status"] in ("not_found", "refused")
+    assert WORD not in text
+    assert WORD not in json.dumps(result)
+
+
+@pytest.mark.parametrize("role", ["employee", "guest"])
+def test_result_matches_cli_json(vault, capsys, role):
+    set_role(role)
+    question = f"where is {WORD}"
+    _, result = call(question)
+    capsys.readouterr()
+    main([question, "--json"])
+    assert result == json.loads(capsys.readouterr().out)
